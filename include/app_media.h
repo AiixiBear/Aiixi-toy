@@ -58,7 +58,9 @@ void media_screen() {
 
     if (M5.BtnA.wasHold()) {
       previousMillis = millis();
-      if (bleHidSendConsumer(mediaActions[sel].bit)) {
+      if (!bleEnabled()) {
+        mediaNotice("BLE OFF");
+      } else if (bleHidSendConsumer(mediaActions[sel].bit)) {
         mediaNotice("SENT");
       } else {
         mediaNotice("NO BT HOST");

@@ -111,7 +111,7 @@
             <h3 class="text-base font-semibold">Photos</h3>
             <span id="photoCount" class="text-xs text-slate-500"></span>
           </div>
-          <p class="mb-3 text-sm text-slate-400">JPEGs for the photo frame slideshow. At most 6 photos, 24 KB each, 110 KB total. Baseline JPEG only (no progressive JPEGs); 240x135 fills the screen.</p>
+          <p class="mb-3 text-sm text-slate-400">JPEGs for the photo frame slideshow. At most 20 photos, 500 KB each, 3 MB total. Baseline JPEG only (no progressive JPEGs); 240x135 fills the screen.</p>
           <div class="card">
             <label for="photoFile" class="flabel">Upload a photo:</label>
             <input type="file" id="photoFile" accept=".jpg,.jpeg,image/jpeg" class="field">
@@ -189,6 +189,16 @@
           <label for="upSlugInput" class="flabel">Status page slug (empty = auto-discover):</label>
           <input type="text" id="upSlugInput" class="field" maxlength="64">
           <button type="button" id="saveUptimeButton" class="btn-primary mt-3">Save Uptime Settings</button>
+        </div>
+
+        <div class="card">
+          <h4 class="cardTitle">Bluetooth</h4>
+          <p class="mb-3 text-sm text-slate-400">Bluetooth LE HID keyboard for typing OTP codes and the media remote. Turning it off disconnects the paired host and stops advertising; turning it back on restarts advertising without a reboot.</p>
+          <label class="flex items-center gap-2 text-sm text-slate-300">
+            <input type="checkbox" id="bleEnabledCheckbox" class="accent-brand-500">
+            Bluetooth enabled
+          </label>
+          <button type="button" id="saveBleButton" class="btn-primary mt-3">Save Bluetooth Settings</button>
         </div>
 
         <div class="card">
@@ -374,6 +384,7 @@
       loadWifiSettings();
       loadWeatherCfg();
       loadUptimeCfg();
+      loadBle();
       loadApps();
       loadPhotos();
       loadMemos();
@@ -751,6 +762,35 @@
       });
     });
 
+    // --- BLUETOOTH LOGIC ---
+    function loadBle() {
+      fetchJson(`${baseUrl}/getBle`)
+        .then(data => {
+          if (data.locked) {
+            return;
+          }
+          document.getElementById('bleEnabledCheckbox').checked = !!data.enabled;
+        })
+        .catch(error => console.error('Error fetching Bluetooth settings:', error));
+    }
+
+    document.getElementById('saveBleButton').addEventListener('click', function() {
+      fetch(`${baseUrl}/setBle`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ enabled: document.getElementById('bleEnabledCheckbox').checked })
+      })
+      .then(response => response.text())
+      .then(message => {
+        toastForResult(message, 'Bluetooth settings saved.');
+      })
+      .catch(error => {
+        console.error('Error saving Bluetooth settings:', error);
+      });
+    });
+
     // --- PHOTO FRAME LOGIC ---
     // Photos come from GET /getPhotos; upload is a multipart POST to
     // /uploadPhoto, delete is a JSON POST to /deletePhoto.
@@ -847,9 +887,9 @@
           fileInput.value = '';
           loadPhotos();
         } else if (text === 'TOO BIG') {
-          showToast('Photo is too big (max 24 KB).', 'error');
+          showToast('Photo is too big (max 500 KB).', 'error');
         } else if (text === 'FULL') {
-          showToast('Photo frame is full (max 6 photos, 110 KB total).', 'error');
+          showToast('Photo frame is full (max 20 photos, 3 MB total).', 'error');
         } else if (text === 'NOT JPG') {
           showToast('Only JPEG files are accepted.', 'error');
         } else {

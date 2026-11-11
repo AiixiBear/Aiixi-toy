@@ -6,6 +6,12 @@ void typeCodeOverBLE(const String& code) {
   M5.Lcd.setFont(&beta8pt7b);
   M5.Lcd.setCursor(10, (current_screen == STICKC) ? 45 : 77);
 
+  if (!bleEnabled()) {
+    M5.Lcd.print("BLE OFF");
+    delay(BLE_NOTICE_MS);
+    return;
+  }
+
   if (!bleHidConnected()) {
     M5.Lcd.print("NO BT HOST");
 // M5.Speaker.tone(2000, 250);

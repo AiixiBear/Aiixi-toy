@@ -3,15 +3,19 @@
 // Shows US AQI, PM2.5, PM10 and the UV index for the current hour.
 // Same location settings as the weather app (NVS wx_lat/wx_lon/wx_name,
 // edited in the WebUI). Fetches on entry and on BtnA, caches 15
-// minutes. UV index is an hourly variable, so the value for the
-// current local hour is picked out of the hourly series; if it cannot
-// be found, today's maximum is shown instead and labelled as such.
+// minutes. The cache is persistent: the last successful fetch is saved
+// to NVS (see wx_cache.h), so the screen shows cached data even with
+// no network or after a reboot, marked CACHED. UV index is an hourly
+// variable, so the value for the current local hour is picked out of
+// the hourly series; if it cannot be found, today's maximum is shown
+// instead and labelled as such.
 
 #ifndef APP_AIR_H
 #define APP_AIR_H
 
 #include <ArduinoJson.h>
 #include "weather_cfg.h"
+#include "wx_cache.h"
 
 #define AIR_CACHE_MS 900000UL  // 15 minutes
 
@@ -42,6 +46,8 @@ struct AirData {
   float uv = -1;      // -1: not reported
   bool uvIsMax = false;
   String updated;     // local HH:MM of the fetch
+  unsigned long epoch = 0;  // now() at fetch time, for cache age
+  bool cached = false;  // true when the data came from the NVS cache
 };
 
 bool airFetch(AirData& data, String& error) {
@@ -109,6 +115,51 @@ bool airFetch(AirData& data, String& error) {
   return true;
 }
 
+// Save the last successful fetch to NVS so it survives leaving the
+// app and rebooting. The JSON carries every display field plus the
+// fetch epoch.
+void airSaveCache(const AirData& data) {
+  JsonDocument doc;
+  doc["pm25"] = data.pm25;
+  doc["pm10"] = data.pm10;
+  doc["aqi"] = data.aqi;
+  doc["uv"] = data.uv;
+  doc["uvIsMax"] = data.uvIsMax;
+  doc["updated"] = data.updated;
+  doc["epoch"] = data.epoch;
+  String json;
+  serializeJson(doc, json);
+  wxCachePut(AIR_CACHE_KEY, json);
+}
+
+// Load the cached fetch into data. Returns false when there is no
+// usable cache; data is left untouched in that case.
+bool airLoadCache(AirData& data) {
+  String json = wxCacheGet(AIR_CACHE_KEY);
+  if (json.length() == 0) {
+    return false;
+  }
+  JsonDocument doc;
+  if (deserializeJson(doc, json) != DeserializationError::Ok) {
+    return false;
+  }
+  if (doc["epoch"].isNull()) {
+    return false;
+  }
+  AirData loaded;
+  loaded.pm25 = doc["pm25"] | 0.0f;
+  loaded.pm10 = doc["pm10"] | 0.0f;
+  loaded.aqi = doc["aqi"] | -1;
+  loaded.uv = doc["uv"] | -1.0f;
+  loaded.uvIsMax = doc["uvIsMax"] | false;
+  loaded.updated = doc["updated"].as<String>();
+  loaded.epoch = doc["epoch"] | 0UL;
+  loaded.ok = true;
+  loaded.cached = true;
+  data = loaded;
+  return true;
+}
+
 void airDraw(const AirData& data, const String& error, bool fetching) {
   M5.Lcd.fillRect(0, toolbar_height, screen_x, screen_y - toolbar_height, bg_color);
   M5.Lcd.setTextColor(txt_color, bg_color);
@@ -117,7 +168,10 @@ void airDraw(const AirData& data, const String& error, bool fetching) {
   M5.Lcd.setCursor(8, toolbar_height + 12);
   M5.Lcd.print(wxGetName());
 
-  if (fetching) {
+  // While fetching with cached data on screen, keep showing the cache
+  // instead of blanking it with UPDATING...; only a first fetch with
+  // no data at all shows the updating line.
+  if (fetching && !data.ok) {
     M5.Lcd.setFont(&beta8pt7b);
     M5.Lcd.setCursor(8, toolbar_height + 40);
     M5.Lcd.print("UPDATING...");
@@ -148,7 +202,8 @@ void airDraw(const AirData& data, const String& error, bool fetching) {
     M5.Lcd.print("PM2.5 " + String(data.pm25, 0) + "  PM10 " + String(data.pm10, 0));
     M5.Lcd.setCursor(8, toolbar_height + 54);
     if (data.uv >= 0) {
-      M5.Lcd.print("UV " + String(data.uv, 0) + " " + uvCategoryText(data.uv));
+      M5.Lcd.print("UV " + String(data.uv, 0) + " " + uvCategoryText(data.uv) +
+                   (data.cached ? " CACHED" : ""));
     } else {
       M5.Lcd.print("UV --");
     }
@@ -176,7 +231,8 @@ void airDraw(const AirData& data, const String& error, bool fetching) {
     }
     M5.Lcd.setFont(&beta5pt7b);
     M5.Lcd.setCursor(8, screen_y - 12);
-    M5.Lcd.print("UPD " + data.updated + "  A: REFRESH");
+    M5.Lcd.print(String(data.cached ? "CACHED UPD " : "UPD ") + data.updated +
+                 "  A: REFRESH");
   }
 }
 
@@ -187,13 +243,40 @@ void air_screen() {
   bool needFetch = true;
   bool fetching = false;
 
+  // Load the persistent cache first and draw it immediately, so the
+  // screen is never empty while offline. A fetch is only needed when
+  // there is no cache or it is older than the 15-minute window; with
+  // an unset clock the age is unknown, so one fetch is attempted.
+  if (airLoadCache(data)) {
+    long ageS = wxCacheAgeS(data.epoch);
+    if (ageS >= 0) {
+      // Seed the RAM freshness timer from the cache age so the
+      // background refresh fires when the window actually expires.
+      unsigned long ageMs = (unsigned long)ageS * 1000UL;
+      lastFetchMs = (ageMs < millis()) ? millis() - ageMs : 0;
+      needFetch = !wxCacheFresh(data.epoch);
+    } else {
+      lastFetchMs = 0;
+      needFetch = true;
+    }
+    airDraw(data, error, false);
+  }
+
   while (!appExitRequested()) {
     if (needFetch) {
       needFetch = false;
       fetching = true;
       airDraw(data, error, true);
-      if (airFetch(data, error)) {
+      // Fetch into a scratch copy: on failure the cached data stays
+      // on screen (marked CACHED) instead of being wiped.
+      AirData fresh;
+      if (airFetch(fresh, error)) {
+        fresh.epoch = (unsigned long)now();
+        fresh.cached = false;
+        data = fresh;
+        airSaveCache(data);
         lastFetchMs = millis();
+        error = "";
       }
       fetching = false;
       airDraw(data, error, false);

@@ -1013,7 +1013,13 @@ server.on("/setWifi", HTTP_POST, []() {
         return;
       }
       int slot = photoNextSlot();
-      if (slot < 0 || photoTotalBytes() + PHOTO_MAX_BYTES > PHOTO_TOTAL_BUDGET) {
+      // Only refuse up front when there is no free slot or the frame
+      // is already at its total budget. The per-file size is enforced
+      // while streaming, and the total budget is checked again when
+      // the upload finishes, so a file smaller than the per-file cap
+      // is not rejected just because the budget assumes a max-size
+      // file would follow it.
+      if (slot < 0 || photoTotalBytes() >= PHOTO_TOTAL_BUDGET) {
         photoUploadError = "FULL";
         return;
       }
@@ -1055,6 +1061,10 @@ server.on("/setWifi", HTTP_POST, []() {
       }
       if (photoUploadError == "" && photoUploadSize < 1024) {
         photoUploadError = "TOO SMALL";
+        SPIFFS.remove(photoUploadPath);
+      } else if (photoUploadError == "" && photoTotalBytes() > PHOTO_TOTAL_BUDGET) {
+        // The finished file pushed the frame over its total budget.
+        photoUploadError = "FULL";
         SPIFFS.remove(photoUploadPath);
       }
     }

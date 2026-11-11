@@ -195,6 +195,44 @@ void registerAppEndpoints() {
     NVS.setString("app_order", stored);
     server.send(200, "text/html", "OK");
   });
+
+  // Bluetooth on/off. GET returns {"enabled": true/false}; POST takes
+  // {"enabled": bool} and applies it immediately, no reboot needed.
+  // The setting is stored in NVS under "ble_enabled" (default on).
+  server.on("/getBle", HTTP_GET, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    jsondata["enabled"] = bleEnabled();
+    String dataout = "";
+    serializeJson(jsondata, dataout);
+    server.send(200, "text/html", dataout);
+  });
+
+  server.on("/setBle", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+
+  server.on("/setBle", HTTP_POST, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    deserializeJson(jsondata, server.arg(0));
+    if (jsondata["enabled"].isNull()) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    bleHidSetEnabled(jsondata["enabled"].as<bool>());
+    server.send(200, "text/html", "OK");
+  });
 }
 
 // Home screen: the app list. Never returns; apps are entered by calling

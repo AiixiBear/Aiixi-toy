@@ -1,10 +1,13 @@
 // Photo frame storage: JPEGs uploaded through the WebUI, stored in the
-// 128 KB SPIFFS partition (min_spiffs.csv). The partition is shared
-// with nothing else, but SPIFFS needs slack, so the budget below stays
-// well under the full size.
+// 4.125MB SPIFFS partition (partitions-8mb-photos.csv, Plus 2 only).
+// SPIFFS needs slack, so the budget below stays well under the full size.
 //
-// Limits (v1, documented in the README and the WebUI):
-//   at most 6 photos, each at most 24 KB, 110 KB total.
+// Limits (documented in the README and the WebUI):
+//   at most 20 photos, each at most 500KB, 3MB total.
+//   500KB lets a 1080p JPEG through without resizing; the device
+//   downscales it to the 240x135 screen. Decoding very large
+//   (multi-megapixel) images is slow, which is why the per-file cap
+//   is 500KB and not unlimited.
 //   Baseline JPEG only: the TJpgDec decoder in M5GFX cannot draw
 //   progressive JPEGs, so those are detected here and skipped.
 
@@ -14,9 +17,9 @@
 #include <SPIFFS.h>
 
 #define PHOTO_DIR "/photos"
-#define PHOTO_MAX_COUNT 6
-#define PHOTO_MAX_BYTES 24576   // 24 KB per photo
-#define PHOTO_TOTAL_BUDGET 110000
+#define PHOTO_MAX_COUNT 20
+#define PHOTO_MAX_BYTES 512000  // 500 KB per photo
+#define PHOTO_TOTAL_BUDGET 3000000  // ~2.86MB total, SPIFFS slack kept
 
 static bool photoFsReady = false;
 

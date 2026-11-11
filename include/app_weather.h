@@ -2,9 +2,12 @@
 //
 // Fetches on entry and on BtnA press; the result is cached, so leaving
 // and re-entering within 15 minutes does not hit the network again.
-// Location (latitude, longitude, display name) is stored in NVS and
-// edited in the WebUI; the default is Taipei. The API timezone is
-// "auto", so daily high/low follow the location, not the device.
+// The cache is persistent: the last successful fetch is saved to NVS
+// (see wx_cache.h), so the screen shows cached data even with no
+// network or after a reboot, marked CACHED. Location (latitude,
+// longitude, display name) is stored in NVS and edited in the WebUI;
+// the default is Taipei. The API timezone is "auto", so daily high/low
+// follow the location, not the device.
 //
 // A fetch blocks for a few seconds while the radio is up; the exit
 // gesture (BtnB held) is only noticed once it returns.
@@ -14,6 +17,7 @@
 
 #include <ArduinoJson.h>
 #include "weather_cfg.h"
+#include "wx_cache.h"
 
 // WMO weather codes (https://open-meteo.com/en/docs).
 const char* wmoWeatherText(int code) {
@@ -46,6 +50,8 @@ struct WeatherData {
   int rainChance = -1;  // -1: not reported
   int code = -1;
   String updated;       // local HH:MM of the fetch
+  unsigned long epoch = 0;  // now() at fetch time, for cache age
+  bool cached = false;  // true when the data came from the NVS cache
 };
 
 #define WX_CACHE_MS 900000UL  // 15 minutes
@@ -96,6 +102,53 @@ bool wxFetch(WeatherData& data, String& error) {
   return true;
 }
 
+// Save the last successful fetch to NVS so it survives leaving the
+// app and rebooting. The JSON carries every display field plus the
+// fetch epoch.
+void wxSaveCache(const WeatherData& data) {
+  JsonDocument doc;
+  doc["temp"] = data.temp;
+  doc["tempMax"] = data.tempMax;
+  doc["tempMin"] = data.tempMin;
+  doc["humidity"] = data.humidity;
+  doc["rainChance"] = data.rainChance;
+  doc["code"] = data.code;
+  doc["updated"] = data.updated;
+  doc["epoch"] = data.epoch;
+  String json;
+  serializeJson(doc, json);
+  wxCachePut(WX_CACHE_KEY, json);
+}
+
+// Load the cached fetch into data. Returns false when there is no
+// usable cache; data is left untouched in that case.
+bool wxLoadCache(WeatherData& data) {
+  String json = wxCacheGet(WX_CACHE_KEY);
+  if (json.length() == 0) {
+    return false;
+  }
+  JsonDocument doc;
+  if (deserializeJson(doc, json) != DeserializationError::Ok) {
+    return false;
+  }
+  if (doc["epoch"].isNull()) {
+    return false;
+  }
+  WeatherData loaded;
+  loaded.temp = doc["temp"] | 0.0f;
+  loaded.tempMax = doc["tempMax"] | 0.0f;
+  loaded.tempMin = doc["tempMin"] | 0.0f;
+  loaded.humidity = doc["humidity"] | 0;
+  loaded.rainChance = doc["rainChance"] | -1;
+  loaded.code = doc["code"] | -1;
+  loaded.updated = doc["updated"].as<String>();
+  loaded.epoch = doc["epoch"] | 0UL;
+  loaded.ok = true;
+  loaded.cached = true;
+  data = loaded;
+  return true;
+}
+
 void wxDraw(const WeatherData& data, const String& error, bool fetching) {
   M5.Lcd.fillRect(0, toolbar_height, screen_x, screen_y - toolbar_height, bg_color);
   M5.Lcd.setTextColor(txt_color, bg_color);
@@ -105,7 +158,10 @@ void wxDraw(const WeatherData& data, const String& error, bool fetching) {
   M5.Lcd.setCursor(8, toolbar_height + 12);
   M5.Lcd.print(wxGetName());
 
-  if (fetching) {
+  // While fetching with cached data on screen, keep showing the cache
+  // instead of blanking it with UPDATING...; only a first fetch with
+  // no data at all shows the updating line.
+  if (fetching && !data.ok) {
     M5.Lcd.setFont(&beta8pt7b);
     M5.Lcd.setCursor(8, toolbar_height + 40);
     M5.Lcd.print("UPDATING...");
@@ -132,7 +188,7 @@ void wxDraw(const WeatherData& data, const String& error, bool fetching) {
     M5.Lcd.print(wmoWeatherText(data.code));
     M5.Lcd.setCursor(8, toolbar_height + 56);
     M5.Lcd.print("H:" + String(data.tempMax, 0) + " L:" + String(data.tempMin, 0) +
-                 "  " + String(data.humidity) + "%");
+                 "  " + String(data.humidity) + "%" + (data.cached ? " CACHED" : ""));
   } else {
     // 240x135: large temperature, condition, details, updated time.
     M5.Lcd.setFont(&mishmash21pt7b);
@@ -153,7 +209,8 @@ void wxDraw(const WeatherData& data, const String& error, bool fetching) {
     }
     M5.Lcd.setFont(&beta5pt7b);
     M5.Lcd.setCursor(8, screen_y - 12);
-    M5.Lcd.print("UPD " + data.updated + "  A: REFRESH");
+    M5.Lcd.print(String(data.cached ? "CACHED UPD " : "UPD ") + data.updated +
+                 "  A: REFRESH");
   }
 }
 
@@ -164,13 +221,40 @@ void weather_screen() {
   bool needFetch = true;
   bool fetching = false;
 
+  // Load the persistent cache first and draw it immediately, so the
+  // screen is never empty while offline. A fetch is only needed when
+  // there is no cache or it is older than the 15-minute window; with
+  // an unset clock the age is unknown, so one fetch is attempted.
+  if (wxLoadCache(data)) {
+    long ageS = wxCacheAgeS(data.epoch);
+    if (ageS >= 0) {
+      // Seed the RAM freshness timer from the cache age so the
+      // background refresh fires when the window actually expires.
+      unsigned long ageMs = (unsigned long)ageS * 1000UL;
+      lastFetchMs = (ageMs < millis()) ? millis() - ageMs : 0;
+      needFetch = !wxCacheFresh(data.epoch);
+    } else {
+      lastFetchMs = 0;
+      needFetch = true;
+    }
+    wxDraw(data, error, false);
+  }
+
   while (!appExitRequested()) {
     if (needFetch) {
       needFetch = false;
       fetching = true;
       wxDraw(data, error, true);
-      if (wxFetch(data, error)) {
+      // Fetch into a scratch copy: on failure the cached data stays
+      // on screen (marked CACHED) instead of being wiped.
+      WeatherData fresh;
+      if (wxFetch(fresh, error)) {
+        fresh.epoch = (unsigned long)now();
+        fresh.cached = false;
+        data = fresh;
+        wxSaveCache(data);
         lastFetchMs = millis();
+        error = "";
       }
       fetching = false;
       wxDraw(data, error, false);

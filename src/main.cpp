@@ -147,8 +147,11 @@ void setup() {
   M5.Lcd.setTextSize(1);
   M5.Lcd.setTextColor(txt_color, bg_color);
 
-  // start the BLE HID keyboard so codes can be typed into a paired host
-  bleHidBegin();
+  // Start the BLE HID keyboard so codes can be typed into a paired host.
+  // Skipped when BLE is switched off in NVS (WebUI Settings).
+  if (bleEnabled()) {
+    bleHidBegin();
+  }
 
   // get tm from RTC
   tm rtc_tm = M5.Rtc.getDateTime().get_tm();

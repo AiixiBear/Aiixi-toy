@@ -101,7 +101,20 @@ static const uint8_t ble_hid_report_map[] = {
 NimBLEHIDDevice* ble_hid_device = nullptr;
 NimBLECharacteristic* ble_hid_input = nullptr;
 NimBLECharacteristic* ble_hid_consumer_input = nullptr;
+NimBLEServer* ble_hid_server = nullptr;
 bool ble_hid_connected = false;
+bool ble_hid_started = false;
+// Runtime on/off state. The NimBLE stack is initialised once and never
+// de-initialised (see bleHidSetEnabled): turning BLE off only stops
+// advertising and disconnects the host, so this flag is what the send
+// paths check.
+bool ble_hid_enabled = true;
+
+// Bluetooth on/off, stored in NVS under "ble_enabled". Default on, so
+// a fresh device behaves exactly as before this switch existed.
+bool bleEnabled() {
+  return NVS.getInt("ble_enabled", 1) == 1;
+}
 
 class BleHidServerCallbacks : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* server) {
@@ -110,8 +123,12 @@ class BleHidServerCallbacks : public NimBLEServerCallbacks {
 
   void onDisconnect(NimBLEServer* server) {
     ble_hid_connected = false;
-    // Make the device discoverable again so the host can reconnect.
-    NimBLEDevice::startAdvertising();
+    // Make the device discoverable again so the host can reconnect,
+    // unless BLE was switched off (disabling disconnects on purpose
+    // and must not start advertising again).
+    if (ble_hid_enabled) {
+      NimBLEDevice::startAdvertising();
+    }
   }
 };
 
@@ -119,8 +136,16 @@ bool bleHidConnected() {
   return ble_hid_connected;
 }
 
-// Bring up the BLE HID keyboard and start advertising.
+// Bring up the BLE HID keyboard and start advertising. No-op when
+// already started, or when BLE is switched off in NVS.
 void bleHidBegin() {
+  if (ble_hid_started) {
+    return;
+  }
+  if (!bleEnabled()) {
+    return;
+  }
+
   NimBLEDevice::init(BLE_HID_DEVICE_NAME);
 
   // Bond with the host so it can reconnect without re-pairing. No MITM
@@ -129,6 +154,7 @@ void bleHidBegin() {
 
   NimBLEServer* server = NimBLEDevice::createServer();
   server->setCallbacks(new BleHidServerCallbacks());
+  ble_hid_server = server;
 
   ble_hid_device = new NimBLEHIDDevice(server);
   ble_hid_input = ble_hid_device->inputReport(BLE_HID_REPORT_ID);
@@ -144,6 +170,40 @@ void bleHidBegin() {
   advertising->setAppearance(HID_KEYBOARD);
   advertising->addServiceUUID(ble_hid_device->hidService()->getUUID());
   advertising->start();
+
+  ble_hid_started = true;
+  ble_hid_enabled = true;
+}
+
+// Switch BLE on or off at runtime and persist the choice in NVS.
+// Enabling restarts advertising (or brings the stack up if it never
+// started). Disabling disconnects any connected host and stops
+// advertising. The NimBLE stack is deliberately NOT de-initialised:
+// NimBLEDevice::deinit() stops the port and controller but leaves the
+// server and advertising objects allocated, and re-running init under
+// those objects was not verified to come back cleanly, so keeping the
+// stack up and silent is the safe path. Power saving from a full
+// deinit is left for later if it is ever measured to matter.
+void bleHidSetEnabled(bool enabled) {
+  NVS.setInt("ble_enabled", enabled ? 1 : 0);
+  ble_hid_enabled = enabled;
+  if (enabled) {
+    if (!ble_hid_started) {
+      bleHidBegin();
+    } else {
+      NimBLEDevice::startAdvertising();
+    }
+    return;
+  }
+  if (ble_hid_server != nullptr) {
+    for (uint16_t connId : ble_hid_server->getPeerDevices()) {
+      ble_hid_server->disconnect(connId);
+    }
+  }
+  if (ble_hid_started) {
+    NimBLEDevice::stopAdvertising();
+  }
+  ble_hid_connected = false;
 }
 
 // Send one key down + key up pair.
@@ -161,10 +221,11 @@ void bleHidSendKey(uint8_t keycode) {
   delay(BLE_HID_KEY_DELAY_MS);
 }
 
-// Type an OTP code. Returns false when no host is connected. Non-digits are
-// skipped, so this stays safe if code formatting ever changes.
+// Type an OTP code. Returns false when BLE is off or no host is
+// connected. Non-digits are skipped, so this stays safe if code
+// formatting ever changes.
 bool bleHidTypeCode(const String& code) {
-  if (!ble_hid_connected || ble_hid_input == nullptr) {
+  if (!ble_hid_enabled || !ble_hid_connected || ble_hid_input == nullptr) {
     return false;
   }
 
@@ -188,9 +249,9 @@ bool bleHidTypeCode(const String& code) {
 #define BLE_HID_CC_VOL_DOWN  6
 
 // Send one media key: set its bit, notify, clear, notify. Returns
-// false when no host is connected.
+// false when BLE is off or no host is connected.
 bool bleHidSendConsumer(uint8_t bit) {
-  if (!ble_hid_connected || ble_hid_consumer_input == nullptr) {
+  if (!ble_hid_enabled || !ble_hid_connected || ble_hid_consumer_input == nullptr) {
     return false;
   }
   uint8_t report[1] = { (uint8_t)(1 << bit) };

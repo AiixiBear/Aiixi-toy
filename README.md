@@ -10,15 +10,15 @@ The TOTP authenticator in Aiixi-toy is based on [OXOTP-plus](https://github.com/
 
 | App | Status |
 | --- | --- |
-| TOTP authenticator (6/8 digits, BLE typing, PIN lock) | Done |
-| Weather (Open-Meteo) | Done — current temp, condition, high/low, humidity, rain chance; location in WebUI settings (default Taipei) |
-| Air quality + UV index (Open-Meteo) | Done — US AQI + category, PM2.5/PM10, UV index for the current hour (today's max if the hour is missing); same location as weather |
-| BLE media remote (play/pause, next/prev, volume) | Done — Consumer Control over the same BLE HID keyboard as OTP typing; a host bonded before this was added may need to re-pair for the media keys to appear |
+| TOTP authenticator (6/8 digits, BLE typing, PIN lock) | Done — BLE typing can be switched off in WebUI Settings (NVS `ble_enabled`, default on; turning it off disconnects the host and stops advertising, turning it back on restarts advertising without a reboot; OTP long-press shows BLE OFF while off) |
+| Weather (Open-Meteo) | Done — current temp, condition, high/low, humidity, rain chance; location in WebUI settings (default Taipei); last successful fetch is cached in NVS (15-min freshness) so the screen shows cached data marked CACHED with no network or after a reboot, BtnA forces a refresh |
+| Air quality + UV index (Open-Meteo) | Done — US AQI + category, PM2.5/PM10, UV index for the current hour (today's max if the hour is missing); same location as weather; same NVS cache as weather (15-min freshness, CACHED marker offline) |
+| BLE media remote (play/pause, next/prev, volume) | Done — Consumer Control over the same BLE HID keyboard as OTP typing; a host bonded before this was added may need to re-pair for the media keys to appear; shows BLE OFF when Bluetooth is switched off |
 | Uptime Kuma status | Done — public status page API (https://uptime.aiixi.cc, no key); slug auto-discovered from /api/entry-page, monitor list from /api/status-page/<slug>, latest status + 24h uptime streamed from /api/status-page/heartbeat/<slug> (parsed as a stream, never held whole in RAM); 5 minute cache |
 | Level (IMU bubble level) | Done — bullseye bubble, pitch/roll in degrees, LEVEL under 2 degrees, BtnA tares on the current surface |
 | Decibel meter (microphone) | Done — RMS level at 16 kHz, ESTIMATE only: SPM1423 datasheet sensitivity (-26 dBFS at 94 dB SPL) gives SPL = dBFS + 120, but the PDM path and case add uncalibrated gain; absolute error is several dB, relative changes are meaningful |
 | QR business card | Done — Nayuki qrcodegen (MIT, vendored), https://a1o.uk at ECC medium, 3 px/module on the Plus2; always black on white for scannability |
-| Photo frame (slideshow) | Done — JPEGs uploaded in the WebUI (Manage tab), stored in the 128 KB SPIFFS partition: max 6 photos, 24 KB each, 110 KB total; baseline JPEG only (progressive JPEGs are detected and skipped, TJpgDec cannot decode them); scaled to fit, 10 s auto-advance, BtnA next |
+| Photo frame (slideshow) | Done — JPEGs uploaded in the WebUI (Manage tab), stored in the 4.125MB SPIFFS partition (Plus 2 only): max 20 photos, 500 KB each, 3 MB total; baseline JPEG only (progressive JPEGs are detected and skipped, TJpgDec cannot decode them); scaled to fit, 10 s auto-advance, BtnA next |
 | Memo quick view | Done — one memo per line, edited in the WebUI (Manage tab), stored as one NVS string (max 1900 chars, the NVS per-value limit), scrollable list on the device |
 | WiFi setup (AP/STA, captive portal, WebUI) | Done |
 | Time drift correction | Done |
@@ -46,8 +46,8 @@ is used; an app missing from the stored order (for example a newly added
 app) is appended at the end, and unknown ids are ignored.
 
 The WebUI manages the apps too: Settings has the app on/off list, the
-Uptime Kuma base URL and slug, and the weather location; Manage has the
-photo upload and the memo editor. The WiFi Setup app cannot be turned
+Uptime Kuma base URL and slug, the weather location, and the Bluetooth
+on/off switch. Manage has the photo upload and the memo editor. The WiFi Setup app cannot be turned
 off: it is the way back to the WebUI.
 
 ![otps section](./img/screenshot_otps.png)

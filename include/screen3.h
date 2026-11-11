@@ -1111,8 +1111,6 @@ void Wifi_screen() {
   // masked since. The password is shown in clear text for 5s, then
   // replaced with asterisks: it would otherwise stay readable by anyone
   // nearby for as long as the WiFi screen is open.
-  unsigned long wifiPassShownAt = 0;
-  bool wifiPassMasked = false;
 
   // clear the screen, except the toolbar area
   M5.Lcd.fillRect(0, toolbar_height, screen_x, screen_y - toolbar_height, bg_color);
@@ -1160,7 +1158,6 @@ void Wifi_screen() {
   // only for M5StickC Plus 2
   if (Wifi_Mode == "AP") {
     M5.Lcd.print (Wifi_PASSWORD);
-    wifiPassShownAt = millis();
 
     if (current_screen == STICKCPLUS2) {
       M5.Lcd.setFont(&beta5pt7b);
@@ -1198,26 +1195,6 @@ void Wifi_screen() {
   Serial.println("HTTP server started");
   
   while (!appExitRequested()) {
-    // Mask the AP password 5s after it was printed. This runs once and
-    // never blocks: the DNS and HTTP handlers below keep running.
-    if (Wifi_Mode == "AP" && !wifiPassMasked && wifiPassShownAt != 0 &&
-        millis() - wifiPassShownAt > 5000) {
-      wifiPassMasked = true;
-      int maskLen = Wifi_PASSWORD.length();
-      if (current_screen == STICKC) {
-        M5.Lcd.setFont(&beta5pt7b);
-        M5.Lcd.fillRect(10, 43, maskLen * 5 + 4, 8, bg_color);
-        M5.Lcd.setCursor(10, 43);
-      } else {
-        M5.Lcd.setFont(&beta8pt7b);
-        M5.Lcd.fillRect(10, 90, maskLen * 7 + 4, 12, bg_color);
-        M5.Lcd.setCursor(10, 90);
-      }
-      M5.Lcd.setTextColor(txt_color, bg_color);
-      for (int i = 0; i < maskLen; i++) {
-        M5.Lcd.print("*");
-      }
-    }
     // Process DNS requests for captive portal
     if (_dnsStarted) {
       dnsServer.processNextRequest();

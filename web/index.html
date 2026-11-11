@@ -202,6 +202,16 @@
         </div>
 
         <div class="card">
+          <h4 class="cardTitle">WebUI Background</h4>
+          <p class="mb-3 text-sm text-slate-400">Keep WiFi and the WebUI running while you use other apps on the device, so this page stays reachable without opening WiFi Setup. Works in both AP and STA mode. Off by default: keeping the radio on uses more battery. You can also toggle it on the device, in WiFi Setup with button A.</p>
+          <label class="flex items-center gap-2 text-sm text-slate-300">
+            <input type="checkbox" id="webuiBgCheckbox" class="accent-brand-500">
+            WebUI runs in background
+          </label>
+          <button type="button" id="saveWebuiBgButton" class="btn-primary mt-3">Save WebUI Background Settings</button>
+        </div>
+
+        <div class="card">
           <h4 class="cardTitle">Screen</h4>
           <label for="screenTimeout" class="flabel">Timeout (s)</label>
           <input type="number" id="screenTimeout" name="screenTimeout" min="0" max="9999" step="5" value="0" class="field">
@@ -385,6 +395,7 @@
       loadWeatherCfg();
       loadUptimeCfg();
       loadBle();
+      loadWebuiBg();
       loadApps();
       loadPhotos();
       loadMemos();
@@ -788,6 +799,35 @@
       })
       .catch(error => {
         console.error('Error saving Bluetooth settings:', error);
+      });
+    });
+
+    // --- WEBUI BACKGROUND LOGIC ---
+    function loadWebuiBg() {
+      fetchJson(`${baseUrl}/getWebuiBg`)
+        .then(data => {
+          if (data.locked) {
+            return;
+          }
+          document.getElementById('webuiBgCheckbox').checked = !!data.enabled;
+        })
+        .catch(error => console.error('Error fetching WebUI background settings:', error));
+    }
+
+    document.getElementById('saveWebuiBgButton').addEventListener('click', function() {
+      fetch(`${baseUrl}/setWebuiBg`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ enabled: document.getElementById('webuiBgCheckbox').checked })
+      })
+      .then(response => response.text())
+      .then(message => {
+        toastForResult(message, 'WebUI background settings saved.');
+      })
+      .catch(error => {
+        console.error('Error saving WebUI background settings:', error);
       });
     });
 

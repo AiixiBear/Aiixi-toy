@@ -233,6 +233,51 @@ void registerAppEndpoints() {
     bleHidSetEnabled(jsondata["enabled"].as<bool>());
     server.send(200, "text/html", "OK");
   });
+
+  // Background WebUI on/off. GET returns {"enabled": true/false};
+  // POST takes {"enabled": bool} and applies it immediately, no
+  // reboot needed. The setting is stored in NVS under "webui_bg"
+  // (default off). Turning it on keeps WiFi (STA or AP) and the HTTP
+  // server running while other apps are used; turning it off stops
+  // the server and powers WiFi down, unless the WiFi screen is open.
+  server.on("/getWebuiBg", HTTP_GET, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    jsondata["enabled"] = webuiBgEnabled();
+    String dataout = "";
+    serializeJson(jsondata, dataout);
+    server.send(200, "text/html", dataout);
+  });
+
+  server.on("/setWebuiBg", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+
+  server.on("/setWebuiBg", HTTP_POST, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    deserializeJson(jsondata, server.arg(0));
+    if (jsondata["enabled"].isNull()) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    // Reply before applying: turning the background off stops the
+    // server and powers WiFi down, which would drop this response
+    // before the browser sees it. A short pause lets the stack flush.
+    server.send(200, "text/html", "OK");
+    delay(100);
+    webuiBgSetEnabled(jsondata["enabled"].as<bool>());
+  });
 }
 
 // Home screen: the app list. Never returns; apps are entered by calling
@@ -266,6 +311,9 @@ void home_screen() {
     }
     M5.update();
     drawAppToolbar();
+    // Background WebUI tick: the home screen has its own loop and does
+    // not go through appExitRequested(), so it ticks here.
+    webuiBgTick();
 
     if (count == 0) {
       if (needRepaint) {

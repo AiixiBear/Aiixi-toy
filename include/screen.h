@@ -178,6 +178,9 @@ bool appExitRequested() {
   }
   M5.update();
   drawAppToolbar();
+  // Background WebUI tick: every app loop runs through here, so the
+  // server keeps being served while any app is open.
+  webuiBgTick();
   if (M5.BtnB.wasHold()) {
     previousMillis = currentMillis;
     return true;

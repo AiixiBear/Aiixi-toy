@@ -15,9 +15,15 @@
 // Connect to the saved STA network (stored by the WebUI WiFi settings).
 // Returns true once an uplink is up. If the device is already
 // connected, this returns immediately. No SSID stored means no uplink.
+// While the background WebUI is active in AP mode there is no uplink
+// and the radio must not be switched to STA: the apps fall back to
+// their NVS cache instead.
 bool netStaConnect() {
   if (WiFi.status() == WL_CONNECTED) {
     return true;
+  }
+  if (webuiBgActive() && Wifi_Mode == "AP") {
+    return false;
   }
   String ssid = NVS.getString("wifi_ssid");
   String pass = NVS.getString("wifi_password");
@@ -36,8 +42,13 @@ bool netStaConnect() {
   return true;
 }
 
-// Drop the connection and power the radio down.
+// Drop the connection and power the radio down. Skipped while the
+// background WebUI is active: the apps reuse the connection it keeps
+// up instead of tearing it down after every fetch.
 void netDisconnect() {
+  if (webuiBgActive()) {
+    return;
+  }
   WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
 }

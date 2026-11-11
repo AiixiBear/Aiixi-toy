@@ -1,10 +1,7 @@
-// DNS Server for Captive Portal
+// Captive portal DNS and the background WebUI service live in
+// webui_bg.h; this file only registers the HTTP routes.
 #include <time.h>
 #include <esp_sntp.h>
-
-DNSServer dnsServer;
-const byte DNS_PORT = 53;
-bool _dnsStarted = false;
 
 // Captive portal redirect handler
 void handleCaptivePortal() {
@@ -98,193 +95,24 @@ bool isDecimalString(const String& s) {
   return digitSeen;
 }
 
-void Wifi_screen() {
+// Photo upload state, shared by the upload handlers in
+// registerWebRoutes(). File scope because the routes are registered
+// outside Wifi_screen().
+static File photoUploadFile;
+static String photoUploadPath = "";
+static String photoUploadError = "";
+static size_t photoUploadSize = 0;
+static bool photoUploadCheckedMagic = false;
 
-  // When the AP password was printed on screen, and whether it has been
-  // masked since. The password is shown in clear text for 5s, then
-  // replaced with asterisks: it would otherwise stay readable by anyone
-  // nearby for as long as the WiFi screen is open.
-  unsigned long wifiPassShownAt = 0;
-  bool wifiPassMasked = false;
-
-  // -------  GET THE WIFI SETTINGS --------- //
-
-  // generate SSID for wifi AP
-  char AP_ssid[16];   
-  String macaddr = String(WiFi.macAddress());
-  macaddr.replace(":", "");
-  macaddr = macaddr.substring(6);
-  String ssid_mac = "Aiixi-toy_" + macaddr;
-  ssid_mac.toCharArray(AP_ssid, 16);
-
-
-  //----- generate password for wifi
-  // Arduino random() is backed by the ESP32 hardware RNG (esp_random)
-  // unless randomSeed() was called, which this project never does, so no
-  // extra seeding is needed. random(min, max) returns [min, max), so the
-  // upper bound must be the full length for every character to be usable.
-  String pass_gen = "";
-  for (int i = 0; i < 12; i++) {
-    pass_gen += rondom_letters[random(0, rondom_letters.length())];
+// HTTP routes for the WebUI. Registered once: the WiFi screen calls
+// this every time it opens, and the background service calls it at
+// boot, so a second call must not add duplicate handlers.
+bool _webRoutesRegistered = false;
+void registerWebRoutes() {
+  if (_webRoutesRegistered) {
+    return;
   }
-  
-  String pass_static = ""; // Default password
-  pass_static = NVS.getString("wifi_password");
-  if (pass_static == "") {
-    pass_static = "1A2B3C4D5E"; // fallback to an unsecure password
-  }
-
-  //0 : random password mode, 1 : static password mode
-  passwordMode = NVS.getInt("passwordMode");
-  Wifi_Mode = NVS.getString("wifiMode"); // Default mode
-
-  if (Wifi_Mode == "") {
-    Wifi_Mode = "AP";   // if the mode is not set, default to AP mode
-  }
-
-  if (Wifi_Mode == "AP") {
-    Wifi_SSID = ssid_mac;
-  } else {
-    Wifi_SSID = NVS.getString("wifi_ssid");
-  }
-  
-  // get password mode settings
-  if (passwordMode == 0 && Wifi_Mode == "AP") {
-    Serial.println("Using random password mode");
-    Wifi_PASSWORD = pass_gen;
-  } else {
-    Serial.println("Using static password mode");
-    Wifi_PASSWORD = pass_static;
-  }
-
-  char password[Wifi_PASSWORD.length() + 1];
-  Wifi_PASSWORD.toCharArray(password, Wifi_PASSWORD.length() + 1);
-
-
-  // clear the screen, except the toolbar area
-  M5.Lcd.fillRect(0, toolbar_height, screen_x, screen_y - toolbar_height, bg_color);
-  show_wait_icon();
-  
-
-  //-------  START WIFI  --------- //
-  if (Wifi_Mode == "AP") {
-    Serial.println("Starting in AP mode");
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(AP_ssid, password);
-    
-    // Start DNS server for captive portal (redirect all DNS to this IP)
-    dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
-    _dnsStarted = true;
-    Serial.println("Captive portal DNS started");
-  } 
-  else if (Wifi_Mode != "AP" && Wifi_SSID != "") { 
-    Serial.println("Starting in STA mode");
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(Wifi_SSID, password);
-    Serial.println("Try Connecting to " + Wifi_SSID);
-
-    // Wait for the connection to complete
-    unsigned long startTime = millis();
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(250);
-      // If the connection doesn't complete within 10 seconds, break the loop
-      if (millis() - startTime > 10000) {
-        break;
-      }
-    }
-    Serial.println("Connection status: " + String(WiFi.status()));
-    // print the ip address in the serial monitor and in the screen
-    Serial.println("Connected to " + Wifi_SSID + " with IP: " + WiFi.localIP().toString());
-
-
-
-  }
-  
-
-  // If the connection failed, fallback to AP mode
-  if (Wifi_Mode != "AP" && WiFi.status() != WL_CONNECTED) {
-    Serial.println("Failed to connect to the specified network. Falling back to AP mode.");
-    Wifi_SSID = ssid_mac;
-    Wifi_Mode = "AP";
-    Wifi_PASSWORD = pass_gen; // generate a new password for fallback AP mode
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP(AP_ssid, pass_gen);
-    Serial.println("AP mode started (fallback)");
-    
-    // Start DNS server for captive portal
-    dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
-    _dnsStarted = true;
-    Serial.println("Captive portal DNS started (fallback)");
-  }
-
-  // STA mode with a working uplink: correct the RTC from NTP. AP mode has
-  // no uplink, and a failed sync simply keeps the previous time.
-  if (Wifi_Mode != "AP" && WiFi.status() == WL_CONNECTED) {
-    syncTimeFromNTP();
-  }
-
-    // use mdns to resolve the hostname
-  if (MDNS.begin("aiixi-toy")) { //http://aiixi-toy.local
-    Serial.println("mDNS responder started");
-    _mdnsStarted = true;
-  }
-  else {
-      Serial.println("Error setting up MDNS responder!");
-    _mdnsStarted = false;
-  }
-
-
-  // clear the wait icon
-  clear_wait_icon();
-
-  // print the wifi settings in the screen
-  if (current_screen == STICKC) {
-    M5.Lcd.setFont(&beta8pt7b);
-    M5.Lcd.setCursor(10, 15);
-  } else {
-    M5.Lcd.setFont(&beta10pt7b);
-    M5.Lcd.setCursor(9, 36);
-  }
-  M5.Lcd.print ("CONNECT TO:");
-
-
-  if (current_screen == STICKC) {
-    M5.Lcd.setFont(&beta5pt7b);
-    M5.Lcd.setCursor(10, 30);
-  } else {
-    M5.Lcd.setFont(&beta8pt7b);
-    M5.Lcd.setCursor(10, 60);
-  }
-   M5.Lcd.print (Wifi_SSID);
-
-    if (current_screen == STICKC) {
-      M5.Lcd.setFont(&beta5pt7b);
-      M5.Lcd.setCursor(10, 43);
-    } else {
-      M5.Lcd.setFont(&beta8pt7b);
-      M5.Lcd.setCursor(10, 90);
-    }
-
-  // we don't want to show the password in the screen if not in AP mode
-  // only for M5StickC Plus 2
-  if (Wifi_Mode == "AP") {
-    M5.Lcd.print (Wifi_PASSWORD);
-    wifiPassShownAt = millis();
-
-    if (current_screen == STICKCPLUS2) {
-      M5.Lcd.setFont(&beta5pt7b);
-      M5.Lcd.setCursor(10, 110);
-      M5.Lcd.print("Auto-popup on connect");
-    }
-  } else {
-    if (_mdnsStarted) {
-      M5.Lcd.print ("goto: Aiixi-toy.local");
-    } else {
-      M5.Lcd.print (WiFi.localIP().toString());
-    }
-  }
-
-
+  _webRoutesRegistered = true;
   //----- start server
   server.enableCORS();
   server.enableCrossOrigin();
@@ -937,11 +765,6 @@ server.on("/setWifi", HTTP_POST, []() {
   // OTA update handler above; the response handler reports the error
   // the upload handler recorded, if any.
 
-  static File photoUploadFile;
-  static String photoUploadPath = "";
-  static String photoUploadError = "";
-  static size_t photoUploadSize = 0;
-  static bool photoUploadCheckedMagic = false;
 
   // List the stored photos with size and dimensions (w/h are 0 when
   // the file is not a decodable baseline JPEG).
@@ -1278,6 +1101,99 @@ server.on("/setWifi", HTTP_POST, []() {
 
   // -- END OTA UPDATE API --
   
+}
+
+void Wifi_screen() {
+  // This screen owns WiFi while it runs; see webui_bg.h.
+  _webuiBgForeground = true;
+
+  // When the AP password was printed on screen, and whether it has been
+  // masked since. The password is shown in clear text for 5s, then
+  // replaced with asterisks: it would otherwise stay readable by anyone
+  // nearby for as long as the WiFi screen is open.
+  unsigned long wifiPassShownAt = 0;
+  bool wifiPassMasked = false;
+
+  // clear the screen, except the toolbar area
+  M5.Lcd.fillRect(0, toolbar_height, screen_x, screen_y - toolbar_height, bg_color);
+  show_wait_icon();
+
+  // Bring WiFi up in the stored mode. When the background service is
+  // already running it owns the radio: keep its mode, SSID and
+  // password instead of starting a second network.
+  if (!webuiBgActive()) {
+    webuiWifiStart();
+  }
+
+  // clear the wait icon
+  clear_wait_icon();
+
+  // print the wifi settings in the screen
+  if (current_screen == STICKC) {
+    M5.Lcd.setFont(&beta8pt7b);
+    M5.Lcd.setCursor(10, 15);
+  } else {
+    M5.Lcd.setFont(&beta10pt7b);
+    M5.Lcd.setCursor(9, 36);
+  }
+  M5.Lcd.print ("CONNECT TO:");
+
+
+  if (current_screen == STICKC) {
+    M5.Lcd.setFont(&beta5pt7b);
+    M5.Lcd.setCursor(10, 30);
+  } else {
+    M5.Lcd.setFont(&beta8pt7b);
+    M5.Lcd.setCursor(10, 60);
+  }
+   M5.Lcd.print (Wifi_SSID);
+
+    if (current_screen == STICKC) {
+      M5.Lcd.setFont(&beta5pt7b);
+      M5.Lcd.setCursor(10, 43);
+    } else {
+      M5.Lcd.setFont(&beta8pt7b);
+      M5.Lcd.setCursor(10, 90);
+    }
+
+  // we don't want to show the password in the screen if not in AP mode
+  // only for M5StickC Plus 2
+  if (Wifi_Mode == "AP") {
+    M5.Lcd.print (Wifi_PASSWORD);
+    wifiPassShownAt = millis();
+
+    if (current_screen == STICKCPLUS2) {
+      M5.Lcd.setFont(&beta5pt7b);
+      M5.Lcd.setCursor(10, 110);
+      M5.Lcd.print("Auto-popup on connect");
+    }
+  } else {
+    if (_mdnsStarted) {
+      M5.Lcd.print ("goto: Aiixi-toy.local");
+    } else {
+      M5.Lcd.print (WiFi.localIP().toString());
+    }
+  }
+
+
+  // Background WebUI status line, with the BtnA toggle hint. Redrawn
+  // from the loop whenever the setting changes: it can also change
+  // from the WebUI while this screen is open. The Plus2 line sits
+  // below the AP hint (y 110); the StickC line sits below the
+  // password (y 43).
+  const int bgStatusY = (current_screen == STICKC) ? 58 : 125;
+  bool bgShown = webuiBgEnabled();
+  auto drawBgStatus = [&]() {
+    M5.Lcd.setFont(&beta5pt7b);
+    M5.Lcd.fillRect(10, bgStatusY, 120, 9, bg_color);
+    M5.Lcd.setTextColor(txt_color, bg_color);
+    M5.Lcd.setCursor(10, bgStatusY);
+    M5.Lcd.print(webuiBgEnabled() ? "WEBUI BG: ON (BtnA)" : "WEBUI BG: OFF (BtnA)");
+    bgShown = webuiBgEnabled();
+  };
+  drawBgStatus();
+
+  registerWebRoutes();
   server.begin();
   Serial.println("HTTP server started");
   
@@ -1307,12 +1223,26 @@ server.on("/setWifi", HTTP_POST, []() {
       dnsServer.processNextRequest();
     }
     server.handleClient();
+    // BtnA toggles the background WebUI; the status line is redrawn
+    // whenever the setting changes (BtnA or the WebUI).
+    if (M5.BtnA.wasClicked()) {
+      previousMillis = millis();
+      webuiBgSetEnabled(!webuiBgEnabled());
+    }
+    if (bgShown != webuiBgEnabled()) {
+      drawBgStatus();
+    }
   }
   
-  // Cleanup when leaving screen
-  if (_dnsStarted) {
-    dnsServer.stop();
-    _dnsStarted = false;
+  // Cleanup when leaving screen. When the background service is
+  // running, the radio and the server stay up for it; the tick keeps
+  // serving them from the home screen and the other apps.
+  _webuiBgForeground = false;
+  if (!webuiBgActive()) {
+    if (_dnsStarted) {
+      dnsServer.stop();
+      _dnsStarted = false;
+    }
+    WiFi.mode(WIFI_OFF);
   }
-  WiFi.mode(WIFI_OFF);
 }

@@ -46,6 +46,7 @@ WebServer server(80);
 #include"Mishmash21pt7b.h"
 
 #include"variable_runtime.h"
+#include"webui_bg.h"
 #include"weather_cfg.h"
 #include"totp_plus.h"
 #include"ble_hid.h"
@@ -185,6 +186,10 @@ void setup() {
   // App enable/disable endpoints (registered here because apps.h, where
   // the registry lives, is included after screen3.h).
   registerAppEndpoints();
+
+  // Background WebUI: if enabled in NVS, bring WiFi and the server up
+  // now so the WebUI is reachable without opening the WiFi screen.
+  webuiBgAutoStart();
 
 }
 

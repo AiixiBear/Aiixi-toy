@@ -20,7 +20,7 @@ The TOTP authenticator in Aiixi-toy is based on [OXOTP-plus](https://github.com/
 | QR business card | Done — Nayuki qrcodegen (MIT, vendored), https://a1o.uk at ECC medium, 3 px/module on the Plus2; always black on white for scannability |
 | Photo frame (slideshow) | Done — JPEGs uploaded in the WebUI (Manage tab), stored in the 4.125MB SPIFFS partition (Plus 2 only): max 20 photos, 500 KB each, 3 MB total; baseline JPEG only (progressive JPEGs are detected and skipped, TJpgDec cannot decode them); scaled to fit, 10 s auto-advance, BtnA next |
 | Memo quick view | Done — one memo per line, edited in the WebUI (Manage tab), stored as one NVS string (max 1900 chars, the NVS per-value limit), scrollable list on the device |
-| WiFi setup (AP/STA, captive portal, WebUI) | Done |
+| WiFi setup (AP/STA, captive portal, WebUI) | Done — the WebUI can also run in the background (NVS `webui_bg`, default off, toggleable in WebUI Settings or in WiFi Setup with button A); STA stays connected, AP keeps broadcasting with the captive portal, and the weather/air/Uptime apps reuse the connection while it is on |
 | Time drift correction | Done |
 
 ## App launcher
@@ -49,6 +49,17 @@ The WebUI manages the apps too: Settings has the app on/off list, the
 Uptime Kuma base URL and slug, the weather location, and the Bluetooth
 on/off switch. Manage has the photo upload and the memo editor. The WiFi Setup app cannot be turned
 off: it is the way back to the WebUI.
+
+The WebUI can also run in the background: Settings has a WebUI
+Background switch (NVS `webui_bg`, default off). When it is on, WiFi
+(STA or AP) and the HTTP server stay up while other apps are used, so
+the WebUI stays reachable without opening WiFi Setup; it can also be
+toggled on the device, in WiFi Setup with button A. While it is on,
+the weather, air quality and Uptime apps reuse the connection instead
+of disconnecting after every fetch. Keeping the radio on uses more
+battery, so it is off by default. Changing the WiFi mode in the WebUI
+takes effect the next time the background service (or the device)
+restarts its WiFi.
 
 ![otps section](./img/screenshot_otps.png)
 

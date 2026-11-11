@@ -45,6 +45,42 @@ bool appIsEnabled(const AppDef& app) {
   return NVS.getInt(String("app_en_") + app.id, 1) == 1;
 }
 
+// App display order, stored in NVS as a comma-separated list of app ids
+// under the key "app_order". No key (or an empty value) means registry
+// order. Unknown ids are ignored; apps missing from the stored list are
+// appended at the end in registry order, so a newly added app always
+// shows up. Returns the number of indices written to out[].
+int loadAppOrder(int* out, int maxOut) {
+  int count = 0;
+  String order = NVS.getString("app_order");
+  int start = 0;
+  while (start < (int)order.length() && count < maxOut) {
+    int comma = order.indexOf(',', start);
+    String id = (comma < 0) ? order.substring(start) : order.substring(start, comma);
+    id.trim();
+    for (int i = 0; i < appCount; i++) {
+      if (id == apps[i].id) {
+        bool dup = false;
+        for (int j = 0; j < count; j++) {
+          if (out[j] == i) { dup = true; break; }
+        }
+        if (!dup) out[count++] = i;
+        break;
+      }
+    }
+    if (comma < 0) break;
+    start = comma + 1;
+  }
+  for (int i = 0; i < appCount; i++) {
+    bool present = false;
+    for (int j = 0; j < count; j++) {
+      if (out[j] == i) { present = true; break; }
+    }
+    if (!present && count < maxOut) out[count++] = i;
+  }
+  return count;
+}
+
 // WebUI endpoints for enabling and disabling apps. Registered from
 // setup() because this file is included after screen3.h, where the
 // other endpoints live. The WiFi Setup app cannot be disabled: it is
@@ -60,7 +96,10 @@ void registerAppEndpoints() {
     }
     jsondata.clear();
     JsonArray list = jsondata["apps"].to<JsonArray>();
-    for (int i = 0; i < appCount; i++) {
+    int ordered[appCount];
+    int orderedCount = loadAppOrder(ordered, appCount);
+    for (int k = 0; k < orderedCount; k++) {
+      int i = ordered[k];
       JsonObject a = list.add<JsonObject>();
       a["id"] = apps[i].id;
       a["label"] = apps[i].label;
@@ -108,16 +147,66 @@ void registerAppEndpoints() {
     NVS.setInt(String("app_en_") + id, enabled ? 1 : 0);
     server.send(200, "text/html", "OK");
   });
+
+  // Reorder the home-screen app list. Body: {"order": ["id", ...]}.
+  // Every id must be a registered app; duplicates are dropped. Ids not
+  // listed keep registry order after the listed ones (loadAppOrder
+  // appends them), so a partial list is valid and a new app is never
+  // lost. An empty list resets to registry order.
+  server.on("/setAppOrder", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+
+  server.on("/setAppOrder", HTTP_POST, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    deserializeJson(jsondata, server.arg(0));
+    if (jsondata["order"].isNull() || !jsondata["order"].is<JsonArray>()) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    bool seen[appCount] = {};
+    String stored = "";
+    JsonArray order = jsondata["order"].as<JsonArray>();
+    for (JsonVariant v : order) {
+      if (v.isNull()) {
+        server.send(200, "text/html", "INVALID");
+        return;
+      }
+      String id = v.as<String>();
+      int idx = -1;
+      for (int i = 0; i < appCount; i++) {
+        if (id == apps[i].id) { idx = i; break; }
+      }
+      if (idx < 0) {
+        server.send(200, "text/html", "INVALID");
+        return;
+      }
+      if (seen[idx]) continue;
+      seen[idx] = true;
+      if (stored.length() > 0) stored += ",";
+      stored += id;
+    }
+    NVS.setString("app_order", stored);
+    server.send(200, "text/html", "OK");
+  });
 }
 
 // Home screen: the app list. Never returns; apps are entered by calling
 // their run() function and return here when the user leaves them.
 void home_screen() {
+  int ordered[appCount];
+  int orderedCount = loadAppOrder(ordered, appCount);
   int ids[appCount];
   int count = 0;
-  for (int i = 0; i < appCount; i++) {
-    if (appIsEnabled(apps[i])) {
-      ids[count++] = i;
+  for (int i = 0; i < orderedCount; i++) {
+    if (appIsEnabled(apps[ordered[i]])) {
+      ids[count++] = ordered[i];
     }
   }
 

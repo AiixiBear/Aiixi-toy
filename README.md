@@ -37,6 +37,14 @@ battery. Apps can be disabled in the WebUI (NVS flag `app_en_<id>`); a
 fresh device shows every app. The device PIN lock still guards the whole
 device at boot, before the home screen appears.
 
+The order of the home-screen list can be changed in the WebUI too: each
+row in the Settings app list has up/down arrows. The order is stored in
+NVS as a comma-separated list of app ids under the key `app_order`
+(`POST /setAppOrder` with `{"order": [...]}`), and the device applies it
+when the home screen is built. With no stored order the registry order
+is used; an app missing from the stored order (for example a newly added
+app) is appended at the end, and unknown ids are ignored.
+
 The WebUI manages the apps too: Settings has the app on/off list, the
 Uptime Kuma base URL and slug, and the weather location; Manage has the
 photo upload and the memo editor. The WiFi Setup app cannot be turned
@@ -85,8 +93,8 @@ Further work done by [@KonradIT](https://github.com/KonradIT) to add:
 
 **6.** *(optional)* Pair the device as a Bluetooth keyboard to type codes without retyping them by hand:
 
-- The device advertises as **OXOTP+** from the moment it boots, no menu needed
-- Pair it from your computer or phone's Bluetooth settings like any other keyboard. The pairing is bonded, so it reconnects on its own afterwards
+- The device advertises as **Aiixi-toy** from the moment it boots, no menu needed
+- Pair it from your computer or phone's Bluetooth settings like any other keyboard. The pairing is bonded, so it reconnects on its own afterwards. If the device was paired before the rename from OXOTP+, forget the old entry in the host's Bluetooth settings and pair it again — the old name will not reconnect
 - A Bluetooth icon appears in the toolbar, next to the battery, while a host is connected
 - On the **OTP** screen: a **short press** cycles to the next code (as before), a **long press** types the code that is currently on screen
 - The keystrokes use the number row, so a host set to a layout where those keys are not digits without Shift (AZERTY, for example) will receive the wrong characters

@@ -57,7 +57,7 @@ void OTP_list_screen() {
         M5.Lcd.print("GO TO WIFI SETUP");
         M5.Lcd.setFont(&beta8pt7b);
         M5.Lcd.setCursor(10, 60);
-        M5.Lcd.print("OXOTP+");
+        M5.Lcd.print("Aiixi-toy");
       }
       continue;
     }

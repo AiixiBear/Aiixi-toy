@@ -92,7 +92,7 @@ void OTP_screen() {
         }
 
         M5.Lcd.setFont(&beta8pt7b);
-        M5.Lcd.print("OXOTP+");
+        M5.Lcd.print("Aiixi-toy");
 
         // if (current_screen == STICKC) {
         //    M5.Lcd.drawXBitmap(90, 17, logoapp_bits, logoapp_width, logoapp_height, BLACK, WHITE);

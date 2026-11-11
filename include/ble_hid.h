@@ -11,7 +11,7 @@
 #include <NimBLEHIDDevice.h>
 #include <NimBLEServer.h>
 
-#define BLE_HID_DEVICE_NAME "OXOTP+"
+#define BLE_HID_DEVICE_NAME "Aiixi-toy"
 #define BLE_HID_REPORT_ID   1
 #define BLE_HID_CONSUMER_REPORT_ID 2
 
@@ -134,7 +134,7 @@ void bleHidBegin() {
   ble_hid_input = ble_hid_device->inputReport(BLE_HID_REPORT_ID);
   ble_hid_consumer_input = ble_hid_device->inputReport(BLE_HID_CONSUMER_REPORT_ID);
 
-  ble_hid_device->manufacturer()->setValue("OXOTP+");
+  ble_hid_device->manufacturer()->setValue("Aiixi-toy");
   ble_hid_device->pnp(0x02, 0xE502, 0xA111, 0x0210);
   ble_hid_device->hidInfo(0x00, 0x01);
   ble_hid_device->reportMap((uint8_t*)ble_hid_report_map, sizeof(ble_hid_report_map));

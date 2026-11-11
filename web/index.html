@@ -210,7 +210,7 @@
 
         <div class="card">
           <h4 class="cardTitle">Apps</h4>
-          <p class="mb-3 text-sm text-slate-400">Choose which apps appear on the device home screen. WiFi Setup stays on: it is the way back to this page.</p>
+          <p class="mb-3 text-sm text-slate-400">Choose which apps appear on the device home screen. Use the arrows to change their order. WiFi Setup stays on: it is the way back to this page.</p>
           <div id="appList" class="flex flex-col gap-2"></div>
         </div>
 
@@ -963,54 +963,119 @@
       });
     });
 
-    // --- APP ENABLE / DISABLE LOGIC ---
+    // --- APP ENABLE / DISABLE / ORDER LOGIC ---
+    // The list is kept in a local array so a reorder can be rendered
+    // immediately; the new order is then saved to the device with
+    // /setAppOrder. A failed save reloads the list from the device.
+    let currentApps = [];
+
+    function saveAppOrder() {
+      return fetch(`${baseUrl}/setAppOrder`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ order: currentApps.map(app => app.id) })
+      })
+      .then(response => response.text())
+      .then(message => {
+        if (!toastForResult(message, 'App order saved.')) {
+          loadApps();
+        }
+      })
+      .catch(error => {
+        console.error('Error saving app order:', error);
+        loadApps();
+      });
+    }
+
+    function moveApp(index, delta) {
+      const target = index + delta;
+      if (target < 0 || target >= currentApps.length) {
+        return;
+      }
+      const moved = currentApps.splice(index, 1)[0];
+      currentApps.splice(target, 0, moved);
+      renderApps();
+      saveAppOrder();
+    }
+
+    function renderApps() {
+      const list = document.getElementById('appList');
+      list.innerHTML = '';
+      currentApps.forEach((app, index) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-center gap-3 rounded-xl border border-line bg-surface-2 px-3 py-2';
+
+        const toggle = document.createElement('label');
+        toggle.className = 'flex min-w-0 flex-1 cursor-pointer items-center gap-3';
+
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.className = 'h-4 w-4 shrink-0 accent-brand-500';
+        box.checked = !!app.enabled;
+        if (app.id === 'wifi') {
+          box.disabled = true;
+        }
+        box.addEventListener('change', function() {
+          fetch(`${baseUrl}/setApps`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ id: app.id, enabled: box.checked })
+          })
+          .then(response => response.text())
+          .then(message => {
+            if (!toastForResult(message, app.label + (box.checked ? ' enabled.' : ' disabled.'))) {
+              box.checked = !box.checked;
+            }
+          })
+          .catch(error => {
+            console.error('Error saving app setting:', error);
+            box.checked = !box.checked;
+          });
+        });
+        toggle.appendChild(box);
+
+        const name = document.createElement('span');
+        name.className = 'truncate text-sm text-slate-100';
+        name.textContent = app.label + (app.id === 'wifi' ? ' (always on)' : '');
+        toggle.appendChild(name);
+        row.appendChild(toggle);
+
+        const move = document.createElement('div');
+        move.className = 'flex shrink-0 flex-col';
+        const up = document.createElement('button');
+        up.type = 'button';
+        up.className = 'rounded px-1 text-xs leading-none text-slate-400 hover:text-slate-100 disabled:opacity-25';
+        up.textContent = '▲';
+        up.disabled = index === 0;
+        up.setAttribute('aria-label', 'Move ' + app.label + ' up');
+        up.addEventListener('click', function() { moveApp(index, -1); });
+        const down = document.createElement('button');
+        down.type = 'button';
+        down.className = 'rounded px-1 text-xs leading-none text-slate-400 hover:text-slate-100 disabled:opacity-25';
+        down.textContent = '▼';
+        down.disabled = index === currentApps.length - 1;
+        down.setAttribute('aria-label', 'Move ' + app.label + ' down');
+        down.addEventListener('click', function() { moveApp(index, 1); });
+        move.appendChild(up);
+        move.appendChild(down);
+        row.appendChild(move);
+
+        list.appendChild(row);
+      });
+    }
+
     function loadApps() {
       return fetchJson(`${baseUrl}/getApps`)
         .then(data => {
           if (data.locked) {
             return;
           }
-          const list = document.getElementById('appList');
-          list.innerHTML = '';
-          (data.apps || []).forEach(app => {
-            const row = document.createElement('label');
-            row.className = 'flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface-2 px-3 py-2';
-
-            const box = document.createElement('input');
-            box.type = 'checkbox';
-            box.className = 'h-4 w-4 shrink-0 accent-brand-500';
-            box.checked = !!app.enabled;
-            if (app.id === 'wifi') {
-              box.disabled = true;
-            }
-            box.addEventListener('change', function() {
-              fetch(`${baseUrl}/setApps`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ id: app.id, enabled: box.checked })
-              })
-              .then(response => response.text())
-              .then(message => {
-                if (!toastForResult(message, app.label + (box.checked ? ' enabled.' : ' disabled.'))) {
-                  box.checked = !box.checked;
-                }
-              })
-              .catch(error => {
-                console.error('Error saving app setting:', error);
-                box.checked = !box.checked;
-              });
-            });
-            row.appendChild(box);
-
-            const name = document.createElement('span');
-            name.className = 'text-sm text-slate-100';
-            name.textContent = app.label + (app.id === 'wifi' ? ' (always on)' : '');
-            row.appendChild(name);
-
-            list.appendChild(row);
-          });
+          currentApps = data.apps || [];
+          renderApps();
         })
         .catch(error => console.error('Error fetching apps:', error));
     }

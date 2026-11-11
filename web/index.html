@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>OXOTP+</title>
+  <title>Aiixi-toy</title>
 
   <link rel="icon" type="image/png" href="/favicon.png">
   <link rel="shortcut icon" type="image/png" href="/favicon.png">
@@ -17,7 +17,7 @@
   <!-- Sticky header: title + device status, then the segmented tabs. -->
   <header class="sticky top-0 z-40 border-b border-line bg-surface/90 backdrop-blur">
     <div class="mx-auto flex w-full max-w-3xl items-center justify-between px-4 py-3">
-      <h1 class="text-lg font-bold tracking-tight">OXOTP+</h1>
+      <h1 class="text-lg font-bold tracking-tight">Aiixi-toy</h1>
       <div class="flex items-center gap-3">
         <span id="deviceStatus" class="hidden text-xs tabular-nums text-slate-400"></span>
         <button type="button" id="quitBtn" class="cursor-pointer text-xs font-medium text-rose-400/80 transition-colors hover:text-rose-400">Quit</button>
@@ -230,11 +230,7 @@
       <!-- Info Panel -->
       <div role="tabpanel" hidden>
         <div class="card">
-        <h4 class="cardTitle"><em>OXOTP+</em></h4>
-        <p class="mb-2 text-sm text-slate-400">
-          Copyright &copy; 2024 Alex Licata <strong>@xick</strong><br>
-          Copyright &copy; 2020 Imad Mezghache
-        </p>
+        <h4 class="cardTitle"><em>Aiixi-toy</em></h4>
         <p class="mb-4 text-sm">Current version <strong>1.2</strong></p>
 
         <h4 class="mb-2 text-base font-semibold">Update Firmware</h4>
@@ -253,7 +249,7 @@
   </main>
 
   <footer class="mx-auto w-full max-w-3xl px-4 pb-6 text-center text-sm text-slate-500">
-    <p>OXOTP+ 2024</p>
+    <p>Aiixi-toy 2024</p>
   </footer>
 
   <script>
@@ -1168,15 +1164,15 @@
       }
 
       if (algorithm && algorithm.toUpperCase() !== 'SHA1') {
-        console.warn(`Warning: Algorithm ${algorithm} detected. OXOTP only supports SHA1.`);
+        console.warn(`Warning: Algorithm ${algorithm} detected. Aiixi-toy only supports SHA1.`);
       }
 
       if (digits !== '6' && digits !== '8') {
-        console.warn(`Warning: ${digits} digits detected. OXOTP supports 6 or 8 digits.`);
+        console.warn(`Warning: ${digits} digits detected. Aiixi-toy supports 6 or 8 digits.`);
       }
 
       if (period && period !== '30') {
-        console.warn(`Warning: ${period}s period detected. OXOTP expects 30 seconds.`);
+        console.warn(`Warning: ${period}s period detected. Aiixi-toy expects 30 seconds.`);
       }
 
       return {
@@ -1212,17 +1208,17 @@
 
         const warnings = [];
         if (parsed.algorithm && parsed.algorithm.toUpperCase() !== 'SHA1') {
-          warnings.push(`Algorithm: ${parsed.algorithm} (OXOTP uses SHA1)`);
+          warnings.push(`Algorithm: ${parsed.algorithm} (Aiixi-toy uses SHA1)`);
         }
         if (parsed.digits !== '6' && parsed.digits !== '8') {
-          warnings.push(`Digits: ${parsed.digits} (OXOTP supports 6 or 8, falling back to 6)`);
+          warnings.push(`Digits: ${parsed.digits} (Aiixi-toy supports 6 or 8, falling back to 6)`);
         }
         if (parsed.period && parsed.period !== '30') {
-          warnings.push(`Period: ${parsed.period}s (OXOTP uses 30s)`);
+          warnings.push(`Period: ${parsed.period}s (Aiixi-toy uses 30s)`);
         }
 
         if (warnings.length > 0) {
-          showToast('URI parsed! Note:\n' + warnings.join('\n') + '\nOXOTP will use defaults.', 'warning', 5000);
+          showToast('URI parsed! Note:\n' + warnings.join('\n') + '\nAiixi-toy will use defaults.', 'warning', 5000);
         } else {
           showToast('URI parsed successfully!', 'success');
         }
@@ -1618,7 +1614,7 @@
 
     // --- QUIT BUTTON ---
     document.getElementById('quitBtn').addEventListener('click', function() {
-      if (confirm('Exit OXOTP configurator?\n\nYou can now disconnect from the OXOTP WiFi network and reconnect to your regular network.')) {
+      if (confirm('Exit Aiixi-toy configurator?\n\nYou can now disconnect from the Aiixi-toy WiFi network and reconnect to your regular network.')) {
         // Try to close the window (works for popups/captive portals)
         window.close();
         
@@ -1627,7 +1623,7 @@
           document.body.innerHTML = `
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; text-align: center; padding: 20px; font-family: sans-serif;">
               <h1 style="color: #4CAF50;">&#10004; Configuration Complete</h1>
-              <p style="font-size: 1.2rem; margin: 20px 0;">You can now disconnect from the OXOTP WiFi network.</p>
+              <p style="font-size: 1.2rem; margin: 20px 0;">You can now disconnect from the Aiixi-toy WiFi network.</p>
               <p style="color: #888;">Go to your device's WiFi settings and connect back to your regular network.</p>
             </div>
           `;

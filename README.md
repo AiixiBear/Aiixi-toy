@@ -1,16 +1,16 @@
-# m5stick-life
+# Aiixi-toy
 
 **M5StickC Plus 2 lifestyle gadget: TOTP authenticator plus weather, air quality, BLE media remote, Uptime Kuma status, level, decibel meter, QR card, photo frame and memos**
 
-m5stick-life turns the M5StickC Plus 2 from a single-purpose TOTP token into a pocketable everyday gadget. TOTP stays a first-class app; the device is now an app launcher, and every feature below is one app on it. Settings for all apps live in the WebUI.
+Aiixi-toy turns the M5StickC Plus 2 from a single-purpose TOTP token into a pocketable everyday gadget. TOTP stays a first-class app; the device is now an app launcher, and every feature below is one app on it. Settings for all apps live in the WebUI.
 
-Based on **OXOTP+** — a reimplementation of the original **OXOTP** work of [@IMSHOX](https://github.com/IMSHOX), with added compatibility for *M5StickCPlus* and *M5StickCPlus 2*, and a new web application by [xick](https://github.com/xick) — as improved in [AiixiBear/OXOTP-plus](https://github.com/AiixiBear/OXOTP-plus) (silenced buzzer, device PIN lock screen, NTP auto-sync, stronger AP password, OTP list screen, Tailwind WebUI).
+The TOTP authenticator in Aiixi-toy is based on [OXOTP-plus](https://github.com/KonradIT/OXOTP-plus) by [KonradIT](https://github.com/KonradIT).
 
 ## Apps
 
 | App | Status |
 | --- | --- |
-| TOTP authenticator (6/8 digits, BLE typing, PIN lock) | Done, kept from OXOTP+ |
+| TOTP authenticator (6/8 digits, BLE typing, PIN lock) | Done |
 | Weather (Open-Meteo) | Done — current temp, condition, high/low, humidity, rain chance; location in WebUI settings (default Taipei) |
 | Air quality + UV index (Open-Meteo) | Done — US AQI + category, PM2.5/PM10, UV index for the current hour (today's max if the hour is missing); same location as weather |
 | BLE media remote (play/pause, next/prev, volume) | Done — Consumer Control over the same BLE HID keyboard as OTP typing; a host bonded before this was added may need to re-pair for the media keys to appear |
@@ -20,8 +20,8 @@ Based on **OXOTP+** — a reimplementation of the original **OXOTP** work of [@I
 | QR business card | Done — Nayuki qrcodegen (MIT, vendored), https://a1o.uk at ECC medium, 3 px/module on the Plus2; always black on white for scannability |
 | Photo frame (slideshow) | Done — JPEGs uploaded in the WebUI (Manage tab), stored in the 128 KB SPIFFS partition: max 6 photos, 24 KB each, 110 KB total; baseline JPEG only (progressive JPEGs are detected and skipped, TJpgDec cannot decode them); scaled to fit, 10 s auto-advance, BtnA next |
 | Memo quick view | Done — one memo per line, edited in the WebUI (Manage tab), stored as one NVS string (max 1900 chars, the NVS per-value limit), scrollable list on the device |
-| WiFi setup (AP/STA, captive portal, WebUI) | Done, kept from OXOTP+ |
-| Time drift correction | Done, kept from OXOTP+ |
+| WiFi setup (AP/STA, captive portal, WebUI) | Done |
+| Time drift correction | Done |
 
 ## App launcher
 
@@ -50,24 +50,13 @@ Uptime Kuma base URL and slug, and the weather location; Manage has the
 photo upload and the memo editor. The WiFi Setup app cannot be turned
 off: it is the way back to the WebUI.
 
-Further work done by [@KonradIT](https://github.com/KonradIT) to add:
-
-- ability to input an `otpauth://` URI in the web app: https://github.com/KonradIT/OXOTP-plus/pull/1
-- PlatformIO compatibility for building the project
-- Captive portal support, so that when a device connects to the AP, it will automatically redirect to the web app: https://github.com/KonradIT/OXOTP-plus/pull/2
-- M5 StickC Plus2 LED + tone: https://github.com/KonradIT/OXOTP-plus/pull/3
-- Support for original M5StickC
-- Support for Time Drift Correction, including alerting when the time is significantly out of sync
-- Support for 8 digit OTP codes alongside the usual 6 digit ones
-- Bluetooth LE keyboard: long press the button on the OTP screen to type the displayed code straight into a paired computer or phone
-
 ![otps section](./img/screenshot_otps.png)
 
 ## HOW TO USE
 
 **1.** Clone locally, using PlatformIO, and build the project for your specific board.
 
-**2.**  For the first time use, by going to the wifi settings the **SSID** and **password** of the access point to connect for the configuration will be printed on screen. A popup will appear on your phone to login, similar to captive portal from the airport WiFi. Click on it and the website will be loaded.
+**2.**  For the first time use, by going to the wifi settings the **SSID** and **password** of the access point to connect for the configuration will be printed on screen. The access point is named `Aiixi-toy_<last 6 hex digits of the MAC address>` (e.g. `Aiixi-toy_A1B2C3`). A popup will appear on your phone to login, similar to captive portal from the airport WiFi. Click on it and the website will be loaded.
 
 **3.** On the **configuration** section of the webapp you can also specify your router ssid and password by changing the wireless mode to host (it will automatically fallback to AP mode if connection fails)
 
@@ -94,7 +83,7 @@ Further work done by [@KonradIT](https://github.com/KonradIT) to add:
 **6.** *(optional)* Pair the device as a Bluetooth keyboard to type codes without retyping them by hand:
 
 - The device advertises as **Aiixi-toy** from the moment it boots, no menu needed
-- Pair it from your computer or phone's Bluetooth settings like any other keyboard. The pairing is bonded, so it reconnects on its own afterwards. If the device was paired before the rename from OXOTP+, forget the old entry in the host's Bluetooth settings and pair it again — the old name will not reconnect
+- Pair it from your computer or phone's Bluetooth settings like any other keyboard. The pairing is bonded, so it reconnects on its own afterwards. If the device was paired before the rename, forget the old entry in the host's Bluetooth settings and pair it again — the old name will not reconnect
 - A Bluetooth icon appears in the toolbar, next to the battery, while a host is connected
 - On the **OTP** screen: a **short press** cycles to the next code (as before), a **long press** types the code that is currently on screen
 - The keystrokes use the number row, so a host set to a layout where those keys are not digits without Shift (AZERTY, for example) will receive the wrong characters
@@ -149,7 +138,7 @@ current stylesheet.)
 
 ## DEVELOPED FOR DAILY USE:
 
-OXOTP+ is intended to be used as an alternative or backup for your currently 2FA authentication app. Using a dedicated device is great because your phone can be easily lost, stolen, hacked, etc. 
+Aiixi-toy is intended to be used as an alternative or backup for your currently 2FA authentication app. Using a dedicated device is great because your phone can be easily lost, stolen, hacked, etc. 
 Always keep a backup (even on paper) of your secrets if you intend to use this as your main 2FA system.
 
 ### MILESTONES
@@ -169,8 +158,6 @@ This software is licensed under the MIT License, to read the full license <a hre
 
 ## Credits
 
-- Based on https://github.com/IMSHOX
-- Pico CSS, a splendid and lightweight css framework (https://github.com/picocss/pico)
 - truetype2gfx - https://rop.nl/truetype2gfx/
 - and the creators of all the libraries used.
 

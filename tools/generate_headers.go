@@ -27,7 +27,7 @@ const bytesPerLine = 22
 
 func main() {
 	fmt.Println(strings.Repeat("=", 50))
-	fmt.Println("OXOTP+ Web Asset Header Generator")
+	fmt.Println("Aiixi-toy Web Asset Header Generator")
 	fmt.Println(strings.Repeat("=", 50))
 	fmt.Println()
 

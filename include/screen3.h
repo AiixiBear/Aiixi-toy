@@ -16,7 +16,7 @@ void handleCaptivePortal() {
 // Serve a simple redirect page for captive portal detection
 void handleCaptiveDetect() {
   previousMillis = millis();
-  String html = "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='0;url=http://192.168.4.1/'></head><body><a href='http://192.168.4.1/'>Click here to configure OXOTP</a></body></html>";
+  String html = "<!DOCTYPE html><html><head><meta http-equiv='refresh' content='0;url=http://192.168.4.1/'></head><body><a href='http://192.168.4.1/'>Click here to configure Aiixi-toy</a></body></html>";
   server.send(200, "text/html", html);
 }
 
@@ -110,12 +110,12 @@ void Wifi_screen() {
   // -------  GET THE WIFI SETTINGS --------- //
 
   // generate SSID for wifi AP
-  char AP_ssid[13];   
+  char AP_ssid[16];   
   String macaddr = String(WiFi.macAddress());
   macaddr.replace(":", "");
   macaddr = macaddr.substring(6);
-  String ssid_mac = "OXOTP_" + macaddr;
-  ssid_mac.toCharArray(AP_ssid, 13);
+  String ssid_mac = "Aiixi-toy_" + macaddr;
+  ssid_mac.toCharArray(AP_ssid, 16);
 
 
   //----- generate password for wifi
@@ -224,7 +224,7 @@ void Wifi_screen() {
   }
 
     // use mdns to resolve the hostname
-  if (MDNS.begin("oxotp")) { //http://esp32.local
+  if (MDNS.begin("aiixi-toy")) { //http://aiixi-toy.local
     Serial.println("mDNS responder started");
     _mdnsStarted = true;
   }
@@ -278,7 +278,7 @@ void Wifi_screen() {
     }
   } else {
     if (_mdnsStarted) {
-      M5.Lcd.print ("goto: OXOTP.local");
+      M5.Lcd.print ("goto: Aiixi-toy.local");
     } else {
       M5.Lcd.print (WiFi.localIP().toString());
     }
@@ -459,7 +459,7 @@ void Wifi_screen() {
 
 
 
-  //----------------check_pin_secure--------------       check if there is a pin in OXOTP
+  //----------------check_pin_secure--------------       check if there is a pin in Aiixi-toy
   // handle preflight OPTIONS request
   server.on("/check_pin_secure", HTTP_OPTIONS, []() {
     server.send(200);
@@ -479,7 +479,7 @@ void Wifi_screen() {
 
 
 
-  //----------------check_pin_LOCK--------------         check if OXOTP is LOCKED
+  //----------------check_pin_LOCK--------------         check if Aiixi-toy is LOCKED
   // handle preflight OPTIONS request
   server.on("/check_pin_LOCK", HTTP_OPTIONS, []() {
     server.send(200);
@@ -497,7 +497,7 @@ void Wifi_screen() {
   });
 
 
-  //----------------set_pin--------------------           set pin to OXOTP
+  //----------------set_pin--------------------           set pin to Aiixi-toy
   server.on("/set_pin", HTTP_OPTIONS, []() {
     server.send(200);
   });
@@ -525,7 +525,7 @@ void Wifi_screen() {
 
 
   });
-  //----------------UNLOCK--------------                UNLOCK the OXOTP
+  //----------------UNLOCK--------------                UNLOCK the Aiixi-toy
   // handle preflight OPTIONS request
   server.on("/UNLOCK", HTTP_OPTIONS, []() {
     server.send(200);
@@ -635,7 +635,7 @@ void Wifi_screen() {
   });
 
 
-  //----------------getOTPs--------------              get the OXOTP list
+  //----------------getOTPs--------------              get the Aiixi-toy list
   server.on("/getOTPs", HTTP_GET, []() {
 
     previousMillis = millis();

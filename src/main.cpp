@@ -1,9 +1,8 @@
 /*
-    OXOTP+
+    Aiixi-toy
    ------------------------------------------
-       Copyright (c) 2024 Alex Licata
-      Copyright (c) 2020 Mezghache imad
-          github.com/xick/OXOTP-plus
+       M5StickC Plus 2 lifestyle gadget
+       TOTP authenticator + everyday apps
   -------------------------------------------
  */
 
@@ -12,8 +11,8 @@
 
 #include <Arduino.h>
 
-#define maxOTPs 30                         // max OTP can hande OXOTP
-//#define timeout_ScreenOn 180000            // The time at which the OXOTP shutdown after inactivity
+#define maxOTPs 30                         // max OTPs the device can handle
+//#define timeout_ScreenOn 180000            // The time after which the device shuts down after inactivity
 
 
 String rondom_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";      // This string contains the characters used to generate the wifi password
@@ -104,9 +103,9 @@ void setup() {
     NVS.setInt("digits_migr", 1);
   }
 
-  Serial.println("===============ESP32-OXOTP+==============");
+  Serial.println("===============Aiixi-toy===============");
   Serial.println("================= V 1.2 ================");
-  Serial.println("===============ESP32-OXOTP+==============");
+  Serial.println("===============Aiixi-toy===============");
 
   // -- Get Preferences from NVS
   if (NVS.getInt("lcd_brightness") != 0) {

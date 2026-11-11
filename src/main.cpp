@@ -15,7 +15,7 @@
 //#define timeout_ScreenOn 180000            // The time after which the device shuts down after inactivity
 
 
-String rondom_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";      // This string contains the characters used to generate the wifi password
+String rondom_letters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";      // This string contains the characters used to generate the wifi password
 
 #include<WiFi.h>
 #include<WebServer.h>

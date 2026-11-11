@@ -1,0 +1,254 @@
+/* OXOTP+ WebUI styles, built with Tailwind CSS v4.
+ *
+ * Source of truth for the page styling. Build it with the standalone
+ * CLI (no Node needed, see README "Modifying the Web Interface"):
+ *
+ *   ./tools/tailwindcss -i web/input.css -o web/tailwind.min.css --minify
+ *
+ * The compiled file is then gzipped into include/css.h by
+ * tools/generate_headers.go and served by the firmware.
+ *
+ * The page is dark-only, matching the device UI, so the color scheme
+ * below is the dark palette. The `dark` variant is defined with the
+ * class strategy and the <html> element carries class="dark", so
+ * dark: utilities keep working if a light theme is ever added.
+ */
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Violet accent, close to the Pico violet theme this page used to use. */
+  --color-brand-300: #c4b5fd;
+  --color-brand-400: #a78bfa;
+  --color-brand-500: #8b5cf6;
+  --color-brand-600: #7c3aed;
+  --color-brand-700: #6d28d9;
+  /* Dark surfaces (Pico dark background is #13171f). */
+  --color-surface: #13171f;
+  --color-surface-2: #1a2029;
+  --color-line: #2e3642;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+}
+
+/* ---- Repeated form controls ---- */
+@layer components {
+  /* Text / password / number / select fields. */
+  .field {
+    @apply mt-1 block w-full rounded-md border border-slate-600 bg-surface-2 px-3 py-2 text-slate-100 placeholder:text-slate-500 focus:border-brand-400 focus:ring-1 focus:ring-brand-400 focus:outline-none;
+  }
+
+  /* Labels above form fields. */
+  .flabel {
+    @apply mt-3 mb-1 block text-sm font-medium text-slate-300;
+  }
+
+  /* Primary action button: solid violet fill. */
+  .btn-primary {
+    @apply block w-full cursor-pointer rounded-lg border border-transparent bg-brand-600 px-4 py-2.5 text-center font-medium text-white transition-colors hover:bg-brand-500;
+  }
+
+  /* Secondary outline button, centered (old .unixButton). */
+  .btn-ghost {
+    @apply mx-auto block cursor-pointer rounded-lg border border-brand-300/70 bg-white/5 px-4 py-2 text-purple-400 transition-colors hover:bg-brand-600 hover:text-white;
+  }
+
+  /* Destructive action: a quiet red text button, not a filled alarm. */
+  .btn-danger {
+    @apply mx-auto block cursor-pointer rounded-lg px-4 py-2 text-rose-400 transition-colors hover:bg-rose-500/10 hover:text-rose-300;
+  }
+
+  /* Card for one settings group (WiFi, Time, Screen, PIN, ...). */
+  .card {
+    @apply mb-4 rounded-2xl border border-line bg-surface-2 p-4;
+  }
+
+  .cardTitle {
+    @apply mb-3 text-base font-semibold text-slate-100;
+  }
+
+  /* Highlighted card for the otpauth:// URI parser, the primary way
+   * to add an account. */
+  .parseBox {
+    @apply mb-4 rounded-2xl border border-brand-500/40 bg-brand-500/10 p-4;
+  }
+
+  .lockPanel {
+    @apply my-4 rounded-2xl border border-brand-300/70 bg-[#5f9ea0]/10 p-4;
+  }
+
+  /* ---- Segmented control tabs ---- */
+  [role="tab"] {
+    @apply flex-1 cursor-pointer rounded-full px-2 py-2 text-center text-sm font-medium text-slate-400 transition-colors;
+  }
+
+  [role="tab"][aria-current] {
+    @apply bg-brand-600 text-white;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  [role="tab"]:hover {
+    @apply text-slate-200;
+  }
+
+  /* ---- Compact OTP list (rows are built by JS) ----
+   * Codes are a supporting detail here, so they stay small: the
+   * device screen is where codes are read, the page is for managing. */
+  .otpItem {
+    @apply mb-2 overflow-hidden rounded-2xl border border-line bg-surface-2;
+  }
+
+  .otpRowWrap {
+    @apply flex items-center gap-1 pr-1;
+  }
+
+  /* The row itself copies the code; the delete button sits beside it
+   * so the two actions never nest. */
+  .otpRow {
+    @apply flex min-w-0 flex-1 cursor-pointer items-center gap-3 bg-transparent px-3 py-2.5 text-left transition-colors hover:bg-white/5;
+  }
+
+  .otpAvatar {
+    @apply flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-bold;
+  }
+
+  .otpMeta {
+    @apply min-w-0 flex-1;
+  }
+
+  .otpLabel {
+    @apply block truncate text-sm font-medium text-slate-100;
+  }
+
+  .otpUser {
+    @apply block truncate text-xs text-slate-400;
+  }
+
+  .otpCodeBox {
+    @apply shrink-0 text-right;
+  }
+
+  .otpCode {
+    @apply block font-mono text-sm tabular-nums tracking-widest text-slate-300;
+  }
+
+  .otpCountdown {
+    @apply mt-0.5 block text-[11px] tabular-nums text-slate-500;
+  }
+
+  /* Quiet delete affordance: a small cross, red only on hover. */
+  .deleteButton {
+    @apply shrink-0 cursor-pointer rounded-full bg-transparent px-2 py-1 text-lg leading-none text-slate-500 transition-colors hover:bg-rose-500/10 hover:text-rose-400;
+  }
+
+  /* Thin remaining-time bar along the bottom of the row. */
+  .otpBar {
+    @apply h-0.5 w-full bg-white/5;
+  }
+
+  .otpBarFill {
+    @apply block h-full bg-brand-400 transition-[width] duration-1000 ease-linear;
+  }
+
+  .otpBarFill.low {
+    @apply bg-rose-400;
+  }
+
+  .otpEmpty {
+    @apply rounded-2xl border border-dashed border-line px-4 py-6 text-center text-sm text-slate-500;
+  }
+
+  /* ---- OTA firmware upload ---- */
+  #file-input {
+    @apply inline-block cursor-pointer rounded-md border-none bg-[#5f9ea0] px-5 py-2.5 text-white;
+  }
+
+  #file-input:hover {
+    @apply bg-purple-700;
+  }
+
+  #file-input:active {
+    @apply bg-[#004080];
+  }
+
+  #prgbar {
+    @apply h-3 w-full overflow-hidden rounded-md bg-white/15;
+  }
+
+  #bar {
+    @apply h-full w-0 rounded-md bg-[#21a692] transition-all duration-200 ease-in-out;
+  }
+
+  #prg {
+    @apply text-center;
+  }
+
+  /* ---- Toast notifications (elements are built by JS) ---- */
+  .toast-container {
+    @apply pointer-events-none fixed bottom-5 left-1/2 z-[9999] flex -translate-x-1/2 flex-col gap-2.5;
+  }
+
+  .toast {
+    animation: toastSlideIn 0.3s ease, toastFadeOut 0.3s ease forwards;
+    animation-delay: 0s, var(--toast-duration, 3s);
+    @apply pointer-events-auto max-w-[90vw] min-w-[280px] rounded-xl border-l-4 border-brand-500 bg-[rgba(33,33,33,0.95)] px-6 py-3.5 whitespace-pre-line text-white;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .toast.success {
+    @apply border-l-green-500;
+  }
+
+  .toast.error {
+    @apply border-l-[#ff6666];
+  }
+
+  .toast.warning {
+    @apply border-l-amber-500;
+  }
+
+  .toast.info {
+    @apply border-l-blue-500;
+  }
+
+  /* Tab panels slide in when shown. */
+  section [role="tabpanel"] {
+    animation-duration: 0.3s;
+    animation-fill-mode: both;
+    animation-name: slideIn;
+  }
+}
+
+@keyframes slideIn {
+  0% {
+    transform: translateY(1rem);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastSlideIn {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastFadeOut {
+  to {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}

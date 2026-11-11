@@ -931,6 +931,294 @@ server.on("/setWifi", HTTP_POST, []() {
     server.send(200, "text/html", "OK");
   });
 
+  // -- PHOTO FRAME API --
+  // Photos are uploaded as multipart form data and stored in SPIFFS
+  // (see photo_store.h for the limits). The upload handler mirrors the
+  // OTA update handler above; the response handler reports the error
+  // the upload handler recorded, if any.
+
+  static File photoUploadFile;
+  static String photoUploadPath = "";
+  static String photoUploadError = "";
+  static size_t photoUploadSize = 0;
+  static bool photoUploadCheckedMagic = false;
+
+  // List the stored photos with size and dimensions (w/h are 0 when
+  // the file is not a decodable baseline JPEG).
+  server.on("/getPhotos", HTTP_GET, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    JsonArray list = jsondata["photos"].to<JsonArray>();
+    String names[PHOTO_MAX_COUNT];
+    int n = photoList(names, PHOTO_MAX_COUNT);
+    for (int i = 0; i < n; i++) {
+      JsonObject p = list.add<JsonObject>();
+      String path = String(PHOTO_DIR) + "/" + names[i];
+      File f = SPIFFS.open(path);
+      p["name"] = names[i];
+      p["size"] = f ? (int)f.size() : 0;
+      if (f) {
+        f.close();
+      }
+      int w = 0, h = 0;
+      if (photoDimensions(path, w, h)) {
+        p["w"] = w;
+        p["h"] = h;
+      } else {
+        p["w"] = 0;
+        p["h"] = 0;
+      }
+    }
+    jsondata["maxCount"] = PHOTO_MAX_COUNT;
+    jsondata["maxBytes"] = PHOTO_MAX_BYTES;
+    jsondata["totalBytes"] = (int)photoTotalBytes();
+    jsondata["budgetBytes"] = PHOTO_TOTAL_BUDGET;
+    String dataout = "";
+    serializeJson(jsondata, dataout);
+    server.send(200, "text/html", dataout);
+  });
+
+  server.on("/uploadPhoto", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+
+  server.on("/uploadPhoto", HTTP_POST, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    server.send(200, "text/html", photoUploadError == "" ? "OK" : photoUploadError);
+  }, []() {
+    HTTPUpload& upload = server.upload();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      return;
+    }
+    if (upload.status == UPLOAD_FILE_START) {
+      photoUploadError = "";
+      photoUploadSize = 0;
+      photoUploadCheckedMagic = false;
+      photoUploadPath = "";
+      String fn = upload.filename;
+      fn.toLowerCase();
+      if (!fn.endsWith(".jpg") && !fn.endsWith(".jpeg")) {
+        photoUploadError = "NOT JPG";
+        return;
+      }
+      int slot = photoNextSlot();
+      if (slot < 0 || photoTotalBytes() + PHOTO_MAX_BYTES > PHOTO_TOTAL_BUDGET) {
+        photoUploadError = "FULL";
+        return;
+      }
+      photoUploadPath = String(PHOTO_DIR) + "/" + String(slot) + ".jpg";
+      photoUploadFile = SPIFFS.open(photoUploadPath, FILE_WRITE);
+      if (!photoUploadFile) {
+        photoUploadError = "FS ERROR";
+        return;
+      }
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+      if (!photoUploadFile || photoUploadError != "") {
+        return;
+      }
+      if (!photoUploadCheckedMagic) {
+        photoUploadCheckedMagic = true;
+        if (upload.currentSize < 2 || upload.buf[0] != 0xFF || upload.buf[1] != 0xD8) {
+          photoUploadError = "NOT JPG";
+          photoUploadFile.close();
+          SPIFFS.remove(photoUploadPath);
+          return;
+        }
+      }
+      photoUploadSize += upload.currentSize;
+      if (photoUploadSize > PHOTO_MAX_BYTES) {
+        photoUploadError = "TOO BIG";
+        photoUploadFile.close();
+        SPIFFS.remove(photoUploadPath);
+        return;
+      }
+      if (photoUploadFile.write(upload.buf, upload.currentSize) != upload.currentSize) {
+        photoUploadError = "FS ERROR";
+        photoUploadFile.close();
+        SPIFFS.remove(photoUploadPath);
+        return;
+      }
+    } else if (upload.status == UPLOAD_FILE_END) {
+      if (photoUploadFile) {
+        photoUploadFile.close();
+      }
+      if (photoUploadError == "" && photoUploadSize < 1024) {
+        photoUploadError = "TOO SMALL";
+        SPIFFS.remove(photoUploadPath);
+      }
+    }
+  });
+
+  server.on("/deletePhoto", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+
+  server.on("/deletePhoto", HTTP_POST, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    deserializeJson(jsondata, server.arg(0));
+    String name = jsondata["name"].as<String>();
+    if (name == "" || name.indexOf('/') >= 0 || name.indexOf("..") >= 0) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    if (SPIFFS.remove(String(PHOTO_DIR) + "/" + name)) {
+      server.send(200, "text/html", "OK");
+    } else {
+      server.send(200, "text/html", "INVALID");
+    }
+  });
+
+  server.on("/deleteAllPhotos", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+
+  server.on("/deleteAllPhotos", HTTP_POST, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    String names[PHOTO_MAX_COUNT];
+    int n = photoList(names, PHOTO_MAX_COUNT);
+    for (int i = 0; i < n; i++) {
+      SPIFFS.remove(String(PHOTO_DIR) + "/" + names[i]);
+    }
+    server.send(200, "text/html", "OK");
+  });
+
+  // -- MEMO API --
+  // Memos are one multi-line string in NVS (see memo_cfg.h). The WebUI
+  // edits the whole text at once; the device shows it line by line.
+
+  server.on("/getMemos", HTTP_GET, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    jsondata["memos"] = memoGet();
+    jsondata["maxLen"] = MEMO_MAX_LEN;
+    String dataout = "";
+    serializeJson(jsondata, dataout);
+    server.send(200, "text/html", dataout);
+  });
+
+  server.on("/setMemos", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+
+  server.on("/setMemos", HTTP_POST, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    deserializeJson(jsondata, server.arg(0));
+    if (jsondata["memos"].isNull()) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    String memos = jsondata["memos"].as<String>();
+    if (memos.length() > MEMO_MAX_LEN) {
+      memos = memos.substring(0, MEMO_MAX_LEN);
+    }
+    NVS.setString(MEMO_KEY, memos);
+    server.send(200, "text/html", "OK");
+  });
+
+  // -- UPTIME KUMA API --
+  // The status page base URL and slug (see uptime_cfg.h). An empty slug
+  // means the app auto-discovers it from /api/entry-page.
+
+  server.on("/getUptimeCfg", HTTP_GET, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    jsondata["base"] = upGetBase();
+    jsondata["slug"] = upGetSlug();
+    String dataout = "";
+    serializeJson(jsondata, dataout);
+    server.send(200, "text/html", dataout);
+  });
+
+  server.on("/setUptimeCfg", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+
+  server.on("/setUptimeCfg", HTTP_POST, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    deserializeJson(jsondata, server.arg(0));
+    if (jsondata["base"].isNull() || jsondata["slug"].isNull()) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    String base = jsondata["base"].as<String>();
+    String slug = jsondata["slug"].as<String>();
+    base.trim();
+    slug.trim();
+    while (base.endsWith("/")) {
+      base.remove(base.length() - 1);
+    }
+    if (base == "" || (!base.startsWith("http://") && !base.startsWith("https://")) ||
+        base.length() > 128) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    if (slug.length() > 64) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    for (unsigned int i = 0; i < slug.length(); i++) {
+      char c = slug.charAt(i);
+      bool okChar = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9') || c == '-' || c == '_';
+      if (!okChar) {
+        server.send(200, "text/html", "INVALID");
+        return;
+      }
+    }
+    // A new base URL invalidates a previously auto-discovered slug,
+    // unless the user typed a different slug explicitly.
+    if (base != upGetBase() && slug == upGetSlug()) {
+      slug = "";
+    }
+    NVS.setString(UP_KEY_BASE, base);
+    NVS.setString(UP_KEY_SLUG, slug);
+    server.send(200, "text/html", "OK");
+  });
+
 
   // -- OTA UPDATE API --
   

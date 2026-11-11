@@ -104,6 +104,36 @@
           <p class="mb-3 text-sm text-slate-400">Tap a row to copy its code.</p>
           <ul id="otpList" class="list-none p-0"></ul>
         </div>
+
+        <!-- Photo frame: JPEGs for the on-device slideshow. -->
+        <div class="mt-6">
+          <div class="mb-1 flex items-baseline justify-between">
+            <h3 class="text-base font-semibold">Photos</h3>
+            <span id="photoCount" class="text-xs text-slate-500"></span>
+          </div>
+          <p class="mb-3 text-sm text-slate-400">JPEGs for the photo frame slideshow. At most 6 photos, 24 KB each, 110 KB total. Baseline JPEG only (no progressive JPEGs); 240x135 fills the screen.</p>
+          <div class="card">
+            <label for="photoFile" class="flabel">Upload a photo:</label>
+            <input type="file" id="photoFile" accept=".jpg,.jpeg,image/jpeg" class="field">
+            <button type="button" id="uploadPhotoButton" class="btn-primary mt-3">Upload Photo</button>
+            <button type="button" id="deleteAllPhotosButton" class="btn-ghost mt-3">Delete All Photos</button>
+          </div>
+          <ul id="photoList" class="list-none p-0"></ul>
+        </div>
+
+        <!-- Memos: one line per memo, edited here, shown on the device. -->
+        <div class="mt-6">
+          <div class="mb-1 flex items-baseline justify-between">
+            <h3 class="text-base font-semibold">Memos</h3>
+            <span id="memoCount" class="text-xs text-slate-500"></span>
+          </div>
+          <p class="mb-3 text-sm text-slate-400">One memo per line, shown on the device in the Memo app.</p>
+          <div class="card">
+            <label for="memoText" class="flabel">Memos:</label>
+            <textarea id="memoText" rows="5" class="field" maxlength="1900" placeholder="Buy milk&#10;Call mom&#10;Water the plants"></textarea>
+            <button type="button" id="saveMemosButton" class="btn-primary mt-3">Save Memos</button>
+          </div>
+        </div>
       </div>
 
       <!-- Settings Panel -->
@@ -152,6 +182,16 @@
         </div>
 
         <div class="card">
+          <h4 class="cardTitle">Uptime Kuma</h4>
+          <p class="mb-3 text-sm text-slate-400">Status page shown by the Uptime Kuma app. Leave the slug empty to auto-discover it from the status page.</p>
+          <label for="upBaseInput" class="flabel">Status page URL:</label>
+          <input type="text" id="upBaseInput" class="field" placeholder="https://uptime.aiixi.cc">
+          <label for="upSlugInput" class="flabel">Status page slug (empty = auto-discover):</label>
+          <input type="text" id="upSlugInput" class="field" maxlength="64">
+          <button type="button" id="saveUptimeButton" class="btn-primary mt-3">Save Uptime Settings</button>
+        </div>
+
+        <div class="card">
           <h4 class="cardTitle">Screen</h4>
           <label for="screenTimeout" class="flabel">Timeout (s)</label>
           <input type="number" id="screenTimeout" name="screenTimeout" min="0" max="9999" step="5" value="0" class="field">
@@ -166,6 +206,12 @@
           <input type="color" id="txt_color" name="txt_color" value="#ffffff" class="field h-10 cursor-pointer p-1">
 
           <button type="button" id="setScreenSettings" class="btn-primary mt-3">Set Screen Settings</button>
+        </div>
+
+        <div class="card">
+          <h4 class="cardTitle">Apps</h4>
+          <p class="mb-3 text-sm text-slate-400">Choose which apps appear on the device home screen. WiFi Setup stays on: it is the way back to this page.</p>
+          <div id="appList" class="flex flex-col gap-2"></div>
         </div>
 
         <div class="card">
@@ -331,6 +377,10 @@
       loadTimezone();
       loadWifiSettings();
       loadWeatherCfg();
+      loadUptimeCfg();
+      loadApps();
+      loadPhotos();
+      loadMemos();
       loadDeviceStatus();
       await loadOtpList();
       await loadCodes();
@@ -704,6 +754,266 @@
         console.error('Error saving weather settings:', error);
       });
     });
+
+    // --- PHOTO FRAME LOGIC ---
+    // Photos come from GET /getPhotos; upload is a multipart POST to
+    // /uploadPhoto, delete is a JSON POST to /deletePhoto.
+    function formatPhotoSize(bytes) {
+      if (bytes >= 1024) {
+        return (bytes / 1024).toFixed(1) + ' KB';
+      }
+      return bytes + ' B';
+    }
+
+    function loadPhotos() {
+      return fetchJson(`${baseUrl}/getPhotos`)
+        .then(data => {
+          if (data.locked) {
+            return;
+          }
+          const list = document.getElementById('photoList');
+          list.innerHTML = '';
+          const countEl = document.getElementById('photoCount');
+          const photos = data.photos || [];
+          countEl.textContent = photos.length + ' / ' + data.maxCount + ' photos, ' +
+            formatPhotoSize(data.totalBytes) + ' / ' + formatPhotoSize(data.budgetBytes);
+
+          if (photos.length === 0) {
+            const emptyItem = document.createElement('li');
+            emptyItem.className = 'otpEmpty';
+            emptyItem.textContent = 'No photos yet. Upload your first one above.';
+            list.appendChild(emptyItem);
+            return;
+          }
+
+          photos.forEach(photo => {
+            const listItem = document.createElement('li');
+            listItem.classList.add('otpItem');
+
+            const rowWrap = document.createElement('div');
+            rowWrap.classList.add('otpRowWrap');
+
+            const row = document.createElement('div');
+            row.classList.add('otpRow');
+
+            const meta = document.createElement('span');
+            meta.classList.add('otpMeta');
+            const labelEl = document.createElement('span');
+            labelEl.classList.add('otpLabel');
+            labelEl.textContent = photo.name;
+            meta.appendChild(labelEl);
+            const userEl = document.createElement('span');
+            userEl.classList.add('otpUser');
+            userEl.textContent = photo.w > 0
+              ? photo.w + 'x' + photo.h + ' - ' + formatPhotoSize(photo.size)
+              : 'Unsupported JPEG - ' + formatPhotoSize(photo.size);
+            meta.appendChild(userEl);
+            row.appendChild(meta);
+
+            rowWrap.appendChild(row);
+
+            const deleteButton = document.createElement('button');
+            deleteButton.type = 'button';
+            deleteButton.classList.add('deleteButton');
+            deleteButton.setAttribute('aria-label', 'Delete ' + photo.name);
+            deleteButton.textContent = '×';
+            deleteButton.addEventListener('click', function(event) {
+              event.stopPropagation();
+              deletePhoto(photo.name);
+            });
+            rowWrap.appendChild(deleteButton);
+
+            listItem.appendChild(rowWrap);
+            list.appendChild(listItem);
+          });
+        })
+        .catch(error => console.error('Error fetching photos:', error));
+    }
+
+    document.getElementById('uploadPhotoButton').addEventListener('click', function() {
+      const fileInput = document.getElementById('photoFile');
+      const file = fileInput.files[0];
+      if (!file) {
+        showToast('Choose a JPEG file first.', 'error');
+        return;
+      }
+      const formData = new FormData();
+      formData.append('photo', file);
+      fetch(`${baseUrl}/uploadPhoto`, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.text())
+      .then(message => {
+        const text = (message || '').trim();
+        if (text === 'OK') {
+          showToast('Photo uploaded.', 'success');
+          fileInput.value = '';
+          loadPhotos();
+        } else if (text === 'TOO BIG') {
+          showToast('Photo is too big (max 24 KB).', 'error');
+        } else if (text === 'FULL') {
+          showToast('Photo frame is full (max 6 photos, 110 KB total).', 'error');
+        } else if (text === 'NOT JPG') {
+          showToast('Only JPEG files are accepted.', 'error');
+        } else {
+          toastForResult(message, 'Photo uploaded.');
+        }
+      })
+      .catch(error => console.error('Error uploading photo:', error));
+    });
+
+    function deletePhoto(name) {
+      fetch(`${baseUrl}/deletePhoto`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: name })
+      })
+      .then(response => response.text())
+      .then(message => {
+        if (toastForResult(message, 'Photo removed.')) {
+          loadPhotos();
+        }
+      })
+      .catch(error => console.error('Error deleting photo:', error));
+    }
+
+    document.getElementById('deleteAllPhotosButton').addEventListener('click', function() {
+      fetch(`${baseUrl}/deleteAllPhotos`, {
+        method: 'POST'
+      })
+      .then(response => response.text())
+      .then(message => {
+        if (toastForResult(message, 'All photos removed.')) {
+          loadPhotos();
+        }
+      })
+      .catch(error => console.error('Error deleting photos:', error));
+    });
+
+    // --- MEMO LOGIC ---
+    // Memos are one multi-line string, edited here as a whole and shown
+    // line by line on the device.
+    function loadMemos() {
+      return fetchJson(`${baseUrl}/getMemos`)
+        .then(data => {
+          if (data.locked) {
+            return;
+          }
+          document.getElementById('memoText').value = data.memos || '';
+          const lines = (data.memos || '').split('\n').filter(line => line.length > 0);
+          document.getElementById('memoCount').textContent =
+            lines.length + ' memos, max ' + (data.maxLen || 1900) + ' chars';
+        })
+        .catch(error => console.error('Error fetching memos:', error));
+    }
+
+    document.getElementById('saveMemosButton').addEventListener('click', function() {
+      const memos = document.getElementById('memoText').value;
+      fetch(`${baseUrl}/setMemos`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ memos: memos })
+      })
+      .then(response => response.text())
+      .then(message => {
+        if (toastForResult(message, 'Memos saved.')) {
+          loadMemos();
+        }
+      })
+      .catch(error => console.error('Error saving memos:', error));
+    });
+
+    // --- UPTIME KUMA LOGIC ---
+    function loadUptimeCfg() {
+      fetchJson(`${baseUrl}/getUptimeCfg`)
+        .then(data => {
+          if (data.locked) {
+            return;
+          }
+          document.getElementById('upBaseInput').value = data.base || '';
+          document.getElementById('upSlugInput').value = data.slug || '';
+        })
+        .catch(error => console.error('Error fetching uptime settings:', error));
+    }
+
+    document.getElementById('saveUptimeButton').addEventListener('click', function() {
+      const payload = {
+        base: document.getElementById('upBaseInput').value.trim(),
+        slug: document.getElementById('upSlugInput').value.trim()
+      };
+
+      fetch(`${baseUrl}/setUptimeCfg`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(response => response.text())
+      .then(message => {
+        toastForResult(message, 'Uptime settings saved.');
+      })
+      .catch(error => {
+        console.error('Error saving uptime settings:', error);
+      });
+    });
+
+    // --- APP ENABLE / DISABLE LOGIC ---
+    function loadApps() {
+      return fetchJson(`${baseUrl}/getApps`)
+        .then(data => {
+          if (data.locked) {
+            return;
+          }
+          const list = document.getElementById('appList');
+          list.innerHTML = '';
+          (data.apps || []).forEach(app => {
+            const row = document.createElement('label');
+            row.className = 'flex cursor-pointer items-center gap-3 rounded-xl border border-line bg-surface-2 px-3 py-2';
+
+            const box = document.createElement('input');
+            box.type = 'checkbox';
+            box.className = 'h-4 w-4 shrink-0 accent-brand-500';
+            box.checked = !!app.enabled;
+            if (app.id === 'wifi') {
+              box.disabled = true;
+            }
+            box.addEventListener('change', function() {
+              fetch(`${baseUrl}/setApps`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id: app.id, enabled: box.checked })
+              })
+              .then(response => response.text())
+              .then(message => {
+                if (!toastForResult(message, app.label + (box.checked ? ' enabled.' : ' disabled.'))) {
+                  box.checked = !box.checked;
+                }
+              })
+              .catch(error => {
+                console.error('Error saving app setting:', error);
+                box.checked = !box.checked;
+              });
+            });
+            row.appendChild(box);
+
+            const name = document.createElement('span');
+            name.className = 'text-sm text-slate-100';
+            name.textContent = app.label + (app.id === 'wifi' ? ' (always on)' : '');
+            row.appendChild(name);
+
+            list.appendChild(row);
+          });
+        })
+        .catch(error => console.error('Error fetching apps:', error));
+    }
 
     // --- BASE32 DECODING LOGIC ---
     // Drop whitespace and padding, uppercase. Used for both manual entry

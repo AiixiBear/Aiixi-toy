@@ -30,6 +30,10 @@ String rondom_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
 #include<ArduinoJson.h>
 #include"ArduinoNvs.h"
 
+// SPIFFS.h must come before M5Unified.h: M5GFX only enables its
+// SPIFFS DataWrapper (used by drawJpgFile) when _SPIFFS_H_ is already
+// defined at the time its headers are parsed.
+#include <SPIFFS.h>
 #include"M5Unified.h"
 
 // Run-Time Variables //
@@ -54,11 +58,22 @@ WebServer server(80);
 #include"screen.h"
 #include"screen1.h"
 #include"screen2.h"
+#include"photo_store.h"
+#include"memo_cfg.h"
+#include"uptime_cfg.h"
 #include"screen3.h"
 #include"screen4.h"
 #include"screen5.h"
 #include"net.h"
 #include"app_weather.h"
+#include"app_air.h"
+#include"app_media.h"
+#include"app_uptime.h"
+#include"app_level.h"
+#include"app_db.h"
+#include"app_qr.h"
+#include"app_photo.h"
+#include"app_memo.h"
 #include"apps.h"
 #include"math.h"
 
@@ -71,6 +86,10 @@ void setup() {
   M5.begin(cfg);
 
   NVS.begin();
+
+  // Photo frame storage (128 KB SPIFFS). Formats on first boot, when
+  // the partition is still empty.
+  photoFsBegin();
 
   // OTP entries stored before digit lengths were configurable have no "D" key;
   // pin them to the 6 digit codes they were generated with.
@@ -160,6 +179,10 @@ void setup() {
   // If a PIN is set, block here until it is entered on the device.
   // No PIN set (or an un-enterable one) means no lock screen.
   requireDeviceUnlock();
+
+  // App enable/disable endpoints (registered here because apps.h, where
+  // the registry lives, is included after screen3.h).
+  registerAppEndpoints();
 
 }
 

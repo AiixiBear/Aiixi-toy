@@ -11,15 +11,15 @@ Based on **OXOTP+** — a reimplementation of the original **OXOTP** work of [@I
 | App | Status |
 | --- | --- |
 | TOTP authenticator (6/8 digits, BLE typing, PIN lock) | Done, kept from OXOTP+ |
-| Weather (Open-Meteo) | Planned |
-| Air quality + UV index (Open-Meteo) | Planned |
-| BLE media remote (play/pause, next/prev, volume) | Planned |
-| Uptime Kuma status | Planned |
-| Level (IMU bubble level) | Planned |
-| Decibel meter (microphone) | Planned |
-| QR business card | Planned |
-| Photo frame (slideshow) | Planned |
-| Memo quick view | Planned |
+| Weather (Open-Meteo) | Done — current temp, condition, high/low, humidity, rain chance; location in WebUI settings (default Taipei) |
+| Air quality + UV index (Open-Meteo) | Done — US AQI + category, PM2.5/PM10, UV index for the current hour (today's max if the hour is missing); same location as weather |
+| BLE media remote (play/pause, next/prev, volume) | Done — Consumer Control over the same BLE HID keyboard as OTP typing; a host bonded before this was added may need to re-pair for the media keys to appear |
+| Uptime Kuma status | Done — public status page API (https://uptime.aiixi.cc, no key); slug auto-discovered from /api/entry-page, monitor list from /api/status-page/<slug>, latest status + 24h uptime streamed from /api/status-page/heartbeat/<slug> (parsed as a stream, never held whole in RAM); 5 minute cache |
+| Level (IMU bubble level) | Done — bullseye bubble, pitch/roll in degrees, LEVEL under 2 degrees, BtnA tares on the current surface |
+| Decibel meter (microphone) | Done — RMS level at 16 kHz, ESTIMATE only: SPM1423 datasheet sensitivity (-26 dBFS at 94 dB SPL) gives SPL = dBFS + 120, but the PDM path and case add uncalibrated gain; absolute error is several dB, relative changes are meaningful |
+| QR business card | Done — Nayuki qrcodegen (MIT, vendored), https://a1o.uk at ECC medium, 3 px/module on the Plus2; always black on white for scannability |
+| Photo frame (slideshow) | Done — JPEGs uploaded in the WebUI (Manage tab), stored in the 128 KB SPIFFS partition: max 6 photos, 24 KB each, 110 KB total; baseline JPEG only (progressive JPEGs are detected and skipped, TJpgDec cannot decode them); scaled to fit, 10 s auto-advance, BtnA next |
+| Memo quick view | Done — one memo per line, edited in the WebUI (Manage tab), stored as one NVS string (max 1900 chars, the NVS per-value limit), scrollable list on the device |
 | WiFi setup (AP/STA, captive portal, WebUI) | Done, kept from OXOTP+ |
 | Time drift correction | Done, kept from OXOTP+ |
 
@@ -36,6 +36,11 @@ The toolbar shows the current app's name, the Bluetooth status and the
 battery. Apps can be disabled in the WebUI (NVS flag `app_en_<id>`); a
 fresh device shows every app. The device PIN lock still guards the whole
 device at boot, before the home screen appears.
+
+The WebUI manages the apps too: Settings has the app on/off list, the
+Uptime Kuma base URL and slug, and the weather location; Manage has the
+photo upload and the memo editor. The WiFi Setup app cannot be turned
+off: it is the way back to the WebUI.
 
 Further work done by [@KonradIT](https://github.com/KonradIT) to add:
 

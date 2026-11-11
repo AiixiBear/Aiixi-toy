@@ -13,6 +13,7 @@
 
 #define BLE_HID_DEVICE_NAME "OXOTP+"
 #define BLE_HID_REPORT_ID   1
+#define BLE_HID_CONSUMER_REPORT_ID 2
 
 // Delay between key down and key up, and between two keys. Slow enough for
 // hosts to register every keystroke, fast enough to stay well inside the 30s
@@ -68,11 +69,38 @@ static const uint8_t ble_hid_report_map[] = {
   0x19, 0x00,                    //   Usage Minimum (0)
   0x29, 0x65,                    //   Usage Maximum (101)
   0x81, 0x00,                    //   Input (Data, Array) - pressed keys
-  0xC0                           // End Collection
+  0xC0,                           // End Collection (keyboard)
+
+  // Consumer Control collection (report ID 2): media keys. One byte,
+  // one bit per key, sent as press then release. The keyboard report
+  // above is untouched, so typing OTP codes keeps working exactly as
+  // before. Note: a host that bonded before this collection existed
+  // may need to re-pair before the media keys appear.
+  0x05, 0x0C,                    // Usage Page (Consumer)
+  0x09, 0x01,                    // Usage (Consumer Control)
+  0xA1, 0x01,                    // Collection (Application)
+  0x85, BLE_HID_CONSUMER_REPORT_ID, //   Report ID (2)
+  0x15, 0x00,                    //   Logical Minimum (0)
+  0x25, 0x01,                    //   Logical Maximum (1)
+  0x75, 0x01,                    //   Report Size (1)
+  0x95, 0x07,                    //   Report Count (7)
+  0x09, 0xB5,                    //   Usage (Scan Next Track)
+  0x09, 0xB6,                    //   Usage (Scan Previous Track)
+  0x09, 0xB7,                    //   Usage (Stop)
+  0x09, 0xCD,                    //   Usage (Play/Pause)
+  0x09, 0xE2,                    //   Usage (Mute)
+  0x09, 0xE9,                    //   Usage (Volume Increment)
+  0x09, 0xEA,                    //   Usage (Volume Decrement)
+  0x81, 0x02,                    //   Input (Data, Variable, Absolute)
+  0x95, 0x01,                    //   Report Count (1)
+  0x75, 0x01,                    //   Report Size (1)
+  0x81, 0x01,                    //   Input (Constant) - padding
+  0xC0                           // End Collection (consumer control)
 };
 
 NimBLEHIDDevice* ble_hid_device = nullptr;
 NimBLECharacteristic* ble_hid_input = nullptr;
+NimBLECharacteristic* ble_hid_consumer_input = nullptr;
 bool ble_hid_connected = false;
 
 class BleHidServerCallbacks : public NimBLEServerCallbacks {
@@ -104,6 +132,7 @@ void bleHidBegin() {
 
   ble_hid_device = new NimBLEHIDDevice(server);
   ble_hid_input = ble_hid_device->inputReport(BLE_HID_REPORT_ID);
+  ble_hid_consumer_input = ble_hid_device->inputReport(BLE_HID_CONSUMER_REPORT_ID);
 
   ble_hid_device->manufacturer()->setValue("OXOTP+");
   ble_hid_device->pnp(0x02, 0xE502, 0xA111, 0x0210);
@@ -146,6 +175,32 @@ bool bleHidTypeCode(const String& code) {
     }
   }
 
+  return true;
+}
+
+// Consumer control bits, in report-map order.
+#define BLE_HID_CC_NEXT      0
+#define BLE_HID_CC_PREV      1
+#define BLE_HID_CC_STOP      2
+#define BLE_HID_CC_PLAYPAUSE 3
+#define BLE_HID_CC_MUTE      4
+#define BLE_HID_CC_VOL_UP    5
+#define BLE_HID_CC_VOL_DOWN  6
+
+// Send one media key: set its bit, notify, clear, notify. Returns
+// false when no host is connected.
+bool bleHidSendConsumer(uint8_t bit) {
+  if (!ble_hid_connected || ble_hid_consumer_input == nullptr) {
+    return false;
+  }
+  uint8_t report[1] = { (uint8_t)(1 << bit) };
+  ble_hid_consumer_input->setValue(report, sizeof(report));
+  ble_hid_consumer_input->notify();
+  delay(BLE_HID_KEY_DELAY_MS);
+  report[0] = 0;
+  ble_hid_consumer_input->setValue(report, sizeof(report));
+  ble_hid_consumer_input->notify();
+  delay(BLE_HID_KEY_DELAY_MS);
   return true;
 }
 

@@ -89,14 +89,94 @@ int photoNextSlot() {
   return -1;
 }
 
-// Parse JPEG dimensions from the SOF marker, walking the segments with
-// seeks so large EXIF blocks before the SOF do not matter. Returns
-// false for non-JPEGs, for progressive JPEGs (SOF2, which the decoder
-// cannot draw), and for truncated files.
+// Walk JPEG markers in a memory buffer. Returns 1 when a baseline
+// SOF was found (w/h set), 0 when the data is not a decodable
+// baseline JPEG, and -1 when the buffer ended before any SOF.
+int photoJpegWalkMem(const uint8_t* buf, size_t len, int& w, int& h) {
+  if (len < 2 || buf[0] != 0xFF || buf[1] != 0xD8) {
+    return 0;
+  }
+  size_t pos = 2;
+  while (true) {
+    while (pos < len && buf[pos] != 0xFF) {
+      pos++;
+    }
+    if (pos >= len) {
+      return -1;
+    }
+    while (pos < len && buf[pos] == 0xFF) {
+      pos++;
+    }
+    if (pos >= len) {
+      return -1;
+    }
+    int marker = buf[pos++];
+    if (marker == 0x00 || marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7)) {
+      continue;
+    }
+    if (marker == 0xDA) {
+      // Start of scan: no SOF marker before the image data.
+      return 0;
+    }
+    if (marker == 0xC0 || marker == 0xC2) {
+      if (marker == 0xC2) {
+        // Progressive JPEG: TJpgDec cannot decode it.
+        return 0;
+      }
+      if (pos + 7 > len) {
+        return -1;
+      }
+      h = (buf[pos + 3] << 8) | buf[pos + 4];
+      w = (buf[pos + 5] << 8) | buf[pos + 6];
+      return (w > 0 && h > 0) ? 1 : 0;
+    }
+    if (pos + 2 > len) {
+      return -1;
+    }
+    uint16_t segLen = (buf[pos] << 8) | buf[pos + 1];
+    if (segLen < 2) {
+      return 0;
+    }
+    pos += segLen;
+    if (pos > len) {
+      return -1;
+    }
+  }
+}
+
+// Parse JPEG dimensions from the SOF marker. Returns false for
+// non-JPEGs, for progressive JPEGs (SOF2, which the decoder cannot
+// draw), and for truncated files.
+//
+// The header (everything before the scan data) is buffered and
+// walked in memory: the original implementation walked the file
+// with single-byte reads and seeks, which on the real device
+// reported even valid baseline files as unsupported while the same
+// bytes parsed fine off-device. When the SOF lies beyond the
+// buffered head (a header block larger than PHOTO_HEAD_BYTES), the
+// walk falls back to streaming reads from the start of the file.
+#define PHOTO_HEAD_BYTES 65536
+
 bool photoDimensions(const String& path, int& w, int& h) {
   File f = SPIFFS.open(path);
   if (!f) {
     return false;
+  }
+  size_t fileSize = f.size();
+  size_t headLen = fileSize < PHOTO_HEAD_BYTES ? fileSize : PHOTO_HEAD_BYTES;
+  uint8_t* head = (uint8_t*)ps_malloc(headLen);
+  if (head == nullptr) {
+    head = (uint8_t*)malloc(headLen);
+  }
+  if (head != nullptr) {
+    size_t got = f.read(head, headLen);
+    int r = photoJpegWalkMem(head, got, w, h);
+    free(head);
+    if (r >= 0) {
+      f.close();
+      return r == 1;
+    }
+    f.seek(0);
   }
   uint8_t soib[2];
   if (f.read(soib, 2) != 2 || soib[0] != 0xFF || soib[1] != 0xD8) {

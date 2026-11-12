@@ -957,6 +957,51 @@ server.on("/setWifi", HTTP_POST, []() {
     server.send(200, "text/html", dataout);
   });
 
+  // Diagnostic for one stored photo: its size, the first bytes as
+  // hex, and what photoDimensions() makes of it. Exists because a
+  // valid baseline upload listed as "Unsupported" on the real device
+  // while the same bytes parsed fine off-device; this separates
+  // "the stored bytes are wrong" from "the parser misread them".
+  server.on("/photoDebug", HTTP_GET, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    String name = server.arg("name");
+    if (name == "" || name.indexOf('/') >= 0 || name.indexOf("..") >= 0) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    String path = String(PHOTO_DIR) + "/" + name;
+    File f = SPIFFS.open(path);
+    if (!f) {
+      server.send(200, "text/html", "NOFILE");
+      return;
+    }
+    jsondata.clear();
+    jsondata["name"] = name;
+    jsondata["size"] = (int)f.size();
+    uint8_t head[32];
+    size_t got = f.read(head, sizeof(head));
+    f.close();
+    String hex = "";
+    for (size_t i = 0; i < got; i++) {
+      char b[4];
+      snprintf(b, sizeof(b), "%02x", head[i]);
+      hex += b;
+    }
+    jsondata["head"] = hex;
+    int w = 0, h = 0;
+    jsondata["dimsOk"] = photoDimensions(path, w, h);
+    jsondata["w"] = w;
+    jsondata["h"] = h;
+    String dataout = "";
+    serializeJson(jsondata, dataout);
+    server.send(200, "text/html", dataout);
+  });
+
   server.on("/uploadPhoto", HTTP_OPTIONS, []() {
     server.send(200);
   });

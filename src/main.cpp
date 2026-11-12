@@ -46,6 +46,7 @@ WebServer server(80);
 #include"Mishmash21pt7b.h"
 
 #include"variable_runtime.h"
+#include"wifi_profiles.h"
 #include"webui_bg.h"
 #include"weather_cfg.h"
 #include"totp_plus.h"

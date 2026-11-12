@@ -648,6 +648,19 @@ server.on("/setWifi", HTTP_POST, []() {
         passwordMode = _passMode;
     }
 
+    // Keep the saved-networks list in sync: a network applied here
+    // joins the list the device screen can pick from (BtnB there).
+    if (!jsondata["ssid"].isNull()) {
+        String _ssid = jsondata["ssid"];
+        String _pass = NVS.getString("wifi_password");
+        if (!jsondata["password"].isNull()) {
+            _pass = jsondata["password"].as<String>();
+        }
+        if (_ssid != "") {
+            wifiProfileUpsert(_ssid, _pass);
+        }
+    }
+
     server.send(200, "text/html", "OK");
 });
 
@@ -670,6 +683,77 @@ server.on("/setWifi", HTTP_POST, []() {
       serializeJson(jsondata, dataout);
 
       server.send(200, "text/html", dataout);
+  });
+
+// endpoint for the saved wifi networks: SSIDs and the last-used one.
+// Passwords are never sent back to the browser.
+  server.on("/getWifiNets", HTTP_GET, []() {
+      previousMillis = millis();
+      String  pincode = NVS.getString ("pincode");
+      if (pin_UNLOCK != pincode) {
+        server.send(200, "text/html", "LOCKED");
+        return;
+      }
+
+      jsondata.clear();
+
+      WifiProfile list[WIFI_PROFILES_MAX];
+      int n = wifiProfilesLoad(list, WIFI_PROFILES_MAX);
+      for (int i = 0; i < n; i++) {
+        jsondata["networks"][i]["ssid"] = list[i].ssid;
+      }
+      jsondata["count"] = n;
+      jsondata["max"] = WIFI_PROFILES_MAX;
+      jsondata["last"] = NVS.getString("wifi_last");
+
+      String dataout = "";
+      serializeJson(jsondata, dataout);
+
+      server.send(200, "text/html", dataout);
+  });
+
+  // add a saved wifi network, or update the password of an existing one
+  server.on("/addWifiNet", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+  server.on("/addWifiNet", HTTP_POST, []() {
+    previousMillis = millis();
+    String  pincode = NVS.getString ("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    deserializeJson(jsondata, server.arg(0));
+    String _ssid = jsondata["ssid"] | "";
+    String _pass = jsondata["password"] | "";
+    if (_ssid == "" || _ssid.length() > 32) {
+      server.send(200, "text/html", "INVALID");
+      return;
+    }
+    if (!wifiProfileUpsert(_ssid, _pass)) {
+      server.send(200, "text/html", "FULL");
+      return;
+    }
+    server.send(200, "text/html", "OK");
+  });
+
+  // delete a saved wifi network
+  server.on("/deleteWifiNet", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+  server.on("/deleteWifiNet", HTTP_POST, []() {
+    previousMillis = millis();
+    String  pincode = NVS.getString ("pincode");
+    if (pin_UNLOCK != pincode) {
+      server.send(200, "text/html", "LOCKED");
+      return;
+    }
+    jsondata.clear();
+    deserializeJson(jsondata, server.arg(0));
+    String _ssid = jsondata["ssid"] | "";
+    wifiProfileDelete(_ssid);
+    server.send(200, "text/html", "OK");
   });
 
 // Get Battery Level and Charging Status
@@ -1193,25 +1277,31 @@ void Wifi_screen() {
   // clear the wait icon
   clear_wait_icon();
 
-  // print the wifi settings in the screen
-  if (current_screen == STICKC) {
-    M5.Lcd.setFont(&beta8pt7b);
-    M5.Lcd.setCursor(10, 15);
-  } else {
-    M5.Lcd.setFont(&beta10pt7b);
-    M5.Lcd.setCursor(9, 36);
-  }
-  M5.Lcd.print ("CONNECT TO:");
+  // Print the connection info. Drawn at entry and again whenever the
+  // picker connects to another network. When saved networks exist,
+  // the Plus2 hint line points at the picker (BtnB) instead of the
+  // captive-portal note.
+  auto drawInfo = [&]() {
+    M5.Lcd.fillRect(0, toolbar_height, screen_x, screen_y - toolbar_height, bg_color);
+    M5.Lcd.setTextColor(txt_color, bg_color);
 
+    if (current_screen == STICKC) {
+      M5.Lcd.setFont(&beta8pt7b);
+      M5.Lcd.setCursor(10, 15);
+    } else {
+      M5.Lcd.setFont(&beta10pt7b);
+      M5.Lcd.setCursor(9, 36);
+    }
+    M5.Lcd.print ("CONNECT TO:");
 
-  if (current_screen == STICKC) {
-    M5.Lcd.setFont(&beta5pt7b);
-    M5.Lcd.setCursor(10, 30);
-  } else {
-    M5.Lcd.setFont(&beta8pt7b);
-    M5.Lcd.setCursor(10, 60);
-  }
-   M5.Lcd.print (Wifi_SSID);
+    if (current_screen == STICKC) {
+      M5.Lcd.setFont(&beta5pt7b);
+      M5.Lcd.setCursor(10, 30);
+    } else {
+      M5.Lcd.setFont(&beta8pt7b);
+      M5.Lcd.setCursor(10, 60);
+    }
+    M5.Lcd.print (Wifi_SSID);
 
     if (current_screen == STICKC) {
       M5.Lcd.setFont(&beta5pt7b);
@@ -1221,23 +1311,31 @@ void Wifi_screen() {
       M5.Lcd.setCursor(10, 90);
     }
 
-  // we don't want to show the password in the screen if not in AP mode
-  // only for M5StickC Plus 2
-  if (Wifi_Mode == "AP") {
-    M5.Lcd.print (Wifi_PASSWORD);
+    // we don't want to show the password in the screen if not in AP mode
+    // only for M5StickC Plus 2
+    if (Wifi_Mode == "AP") {
+      M5.Lcd.print (Wifi_PASSWORD);
 
-    if (current_screen == STICKCPLUS2) {
-      M5.Lcd.setFont(&beta5pt7b);
-      M5.Lcd.setCursor(10, 110);
-      M5.Lcd.print("Auto-popup on connect");
-    }
-  } else {
-    if (_mdnsStarted) {
-      M5.Lcd.print ("goto: Aiixi-toy.local");
+      if (current_screen == STICKCPLUS2) {
+        M5.Lcd.setFont(&beta5pt7b);
+        M5.Lcd.setCursor(10, 110);
+        M5.Lcd.print(wifiProfilesCount() > 0 ? "BtnB: CHOOSE NETWORK" : "Auto-popup on connect");
+      }
     } else {
-      M5.Lcd.print (WiFi.localIP().toString());
+      if (_mdnsStarted) {
+        M5.Lcd.print ("goto: Aiixi-toy.local");
+      } else {
+        M5.Lcd.print (WiFi.localIP().toString());
+      }
+
+      if (current_screen == STICKCPLUS2 && wifiProfilesCount() > 0) {
+        M5.Lcd.setFont(&beta5pt7b);
+        M5.Lcd.setCursor(10, 110);
+        M5.Lcd.print("BtnB: CHOOSE NETWORK");
+      }
     }
-  }
+  };
+  drawInfo();
 
 
   // Background WebUI status line, with the BtnA toggle hint. Redrawn
@@ -1257,24 +1355,132 @@ void Wifi_screen() {
   };
   drawBgStatus();
 
+  // Saved-network picker (Plus2 only: the StickC screen has no room
+  // for the list; saved profiles still drive its auto-connect). BtnB
+  // opens the picker from the info view and moves its cursor there;
+  // BtnA connects to the highlighted network; BtnA hold goes back.
+  bool picking = false;
+  int pickIndex = 0;
+  WifiProfile pickList[WIFI_PROFILES_MAX];
+  int pickCount = 0;
+  auto drawPick = [&]() {
+    M5.Lcd.fillRect(0, toolbar_height, screen_x, screen_y - toolbar_height, bg_color);
+    M5.Lcd.setTextColor(txt_color, bg_color);
+    M5.Lcd.setFont(&beta8pt7b);
+    M5.Lcd.setCursor(10, 34);
+    M5.Lcd.print("SELECT NETWORK:");
+    // Three-row window that follows the cursor.
+    int first = pickIndex - 1;
+    if (first > pickCount - 3) {
+      first = pickCount - 3;
+    }
+    if (first < 0) {
+      first = 0;
+    }
+    for (int r = 0; r < 3; r++) {
+      int i = first + r;
+      if (i >= pickCount) {
+        break;
+      }
+      M5.Lcd.setCursor(10, 56 + r * 20);
+      String line = (i == pickIndex) ? "> " : "  ";
+      String ssid = pickList[i].ssid;
+      if (ssid.length() > 17) {
+        ssid = ssid.substring(0, 17);
+      }
+      line += ssid;
+      if (Wifi_Mode == "STA" && WiFi.status() == WL_CONNECTED && pickList[i].ssid == Wifi_SSID) {
+        line += " *";
+      }
+      M5.Lcd.print(line);
+    }
+    M5.Lcd.setFont(&beta5pt7b);
+    M5.Lcd.setCursor(10, 122);
+    M5.Lcd.print("B: NEXT  A: CONNECT  A HOLD: BACK");
+  };
+
   registerWebRoutes();
   server.begin();
   Serial.println("HTTP server started");
-  
+
   while (!appExitRequested()) {
     // Process DNS requests for captive portal
     if (_dnsStarted) {
       dnsServer.processNextRequest();
     }
     server.handleClient();
-    // BtnA toggles the background WebUI; the status line is redrawn
-    // whenever the setting changes (BtnA or the WebUI).
-    if (M5.BtnA.wasClicked()) {
-      previousMillis = millis();
-      webuiBgSetEnabled(!webuiBgEnabled());
-    }
-    if (bgShown != webuiBgEnabled()) {
-      drawBgStatus();
+    if (picking) {
+      if (M5.BtnB.wasClicked()) {
+        previousMillis = millis();
+        pickIndex = (pickIndex + 1) % pickCount;
+        drawPick();
+      }
+      if (M5.BtnA.wasHold()) {
+        previousMillis = millis();
+        picking = false;
+        drawInfo();
+        drawBgStatus();
+      } else if (M5.BtnA.wasClicked()) {
+        previousMillis = millis();
+        // Leaving AP mode: the captive portal DNS no longer applies.
+        if (_dnsStarted) {
+          dnsServer.stop();
+          _dnsStarted = false;
+        }
+        M5.Lcd.fillRect(0, toolbar_height, screen_x, screen_y - toolbar_height, bg_color);
+        show_wait_icon();
+        bool ok = wifiConnectProfile(pickList[pickIndex], 8000);
+        clear_wait_icon();
+        picking = false;
+        if (ok) {
+          // Picking a network is a mode decision too: the next WiFi
+          // start (boot, background service) uses STA directly.
+          NVS.setString("wifiMode", "STA");
+          syncTimeFromNTP();
+          if (MDNS.begin("aiixi-toy")) {
+            _mdnsStarted = true;
+          }
+        } else {
+          M5.Lcd.setTextColor(txt_color, bg_color);
+          M5.Lcd.setFont(&beta8pt7b);
+          M5.Lcd.setCursor(10, 60);
+          M5.Lcd.print("CONNECT FAILED");
+          delay(1200);
+          // Restore whatever the stored mode brings up (with its
+          // usual AP fallback) after the failed attempt.
+          webuiWifiStart();
+        }
+        drawInfo();
+        drawBgStatus();
+      }
+    } else {
+      // BtnA toggles the background WebUI; the status line is redrawn
+      // whenever the setting changes (BtnA or the WebUI).
+      if (M5.BtnA.wasClicked()) {
+        previousMillis = millis();
+        webuiBgSetEnabled(!webuiBgEnabled());
+      }
+      // BtnB opens the saved-network picker when there is anything
+      // to pick.
+      if (M5.BtnB.wasClicked() && current_screen == STICKCPLUS2) {
+        pickCount = wifiProfilesLoad(pickList, WIFI_PROFILES_MAX);
+        if (pickCount > 0) {
+          previousMillis = millis();
+          pickIndex = 0;
+          String last = NVS.getString("wifi_last");
+          for (int i = 0; i < pickCount; i++) {
+            if (pickList[i].ssid == Wifi_SSID || pickList[i].ssid == last) {
+              pickIndex = i;
+              break;
+            }
+          }
+          picking = true;
+          drawPick();
+        }
+      }
+      if (bgShown != webuiBgEnabled()) {
+        drawBgStatus();
+      }
     }
   }
   

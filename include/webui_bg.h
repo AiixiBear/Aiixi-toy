@@ -103,23 +103,30 @@ String webuiWifiStart() {
       _dnsStarted = true;
       Serial.println("Captive portal DNS started");
     }
-  } else if (Wifi_SSID != "") {
+  } else {
     Serial.println("Starting in STA mode");
-    WiFi.mode(WIFI_STA);
-    WiFi.begin(Wifi_SSID.c_str(), Wifi_PASSWORD.c_str());
-    Serial.println("Try Connecting to " + Wifi_SSID);
+    // Saved networks first (the last-used one wins); the legacy
+    // single network is only used when no profiles are stored.
+    bool connected = wifiConnectSaved(8000, 24000);
+    if (!connected && wifiProfilesCount() == 0 && Wifi_SSID != "") {
+      WiFi.mode(WIFI_STA);
+      WiFi.begin(Wifi_SSID.c_str(), Wifi_PASSWORD.c_str());
+      Serial.println("Try Connecting to " + Wifi_SSID);
 
-    // Wait for the connection to complete
-    unsigned long startTime = millis();
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(250);
-      // If the connection doesn't complete within 10 seconds, break the loop
-      if (millis() - startTime > 10000) {
-        break;
+      // Wait for the connection to complete
+      unsigned long startTime = millis();
+      while (WiFi.status() != WL_CONNECTED) {
+        delay(250);
+        // If the connection doesn't complete within 10 seconds, break the loop
+        if (millis() - startTime > 10000) {
+          break;
+        }
       }
     }
     Serial.println("Connection status: " + String(WiFi.status()));
-    Serial.println("Connected to " + Wifi_SSID + " with IP: " + WiFi.localIP().toString());
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.println("Connected to " + Wifi_SSID + " with IP: " + WiFi.localIP().toString());
+    }
   }
 
   // STA without a link falls back to AP, same as the WiFi screen.

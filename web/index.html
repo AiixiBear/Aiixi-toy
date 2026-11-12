@@ -251,6 +251,13 @@
           <p class="mt-1.5 text-xs leading-relaxed text-slate-500">Random: a new password is generated each time you open WiFi Setup on the device, and shown on its screen. Fixed: the device always uses the Password above.</p>
 
           <button type="button" id="applyWifiButton" class="btn-primary mt-4">Apply</button>
+
+          <div class="mt-5 border-t border-slate-700/60 pt-4">
+            <h5 class="mb-1 text-sm font-semibold">Saved networks</h5>
+            <p class="mb-3 text-xs leading-relaxed text-slate-500">Up to 8 networks. Applying the settings above also saves that network here. On the device, open WiFi Setup and press BtnB to pick one; the network it connected to last is tried first automatically.</p>
+            <ul id="wifiNetList" class="flex flex-col gap-2"></ul>
+            <p id="wifiNetEmpty" class="text-sm text-slate-500">No saved networks yet.</p>
+          </div>
         </div>
 
         <div class="card">
@@ -543,6 +550,7 @@
       loadScreenSettings();
       loadTimezone();
       loadWifiSettings();
+      loadWifiNets();
       loadWeatherCfg();
       loadUptimeCfg();
       loadBle();
@@ -1945,11 +1953,63 @@
       .then(response => response.text())
       .then(message => {
         toastForResult(message, 'WiFi settings applied.');
+        if (message === 'OK') loadWifiNets();
       })
       .catch(error => {
         console.error('Error applying settings:', error);
       });
     });
+
+    // Saved networks: SSIDs from /getWifiNets (the firmware never
+    // sends passwords back). Deleting re-renders from the device.
+    function loadWifiNets() {
+      fetchJson(`${baseUrl}/getWifiNets`)
+        .then(data => {
+          if (!data || data.locked) return;
+          const listEl = document.getElementById('wifiNetList');
+          const nets = data.networks || [];
+          document.getElementById('wifiNetEmpty').style.display = nets.length ? 'none' : '';
+          listEl.innerHTML = '';
+          nets.forEach(net => {
+            const row = document.createElement('li');
+            row.className = 'flex items-center justify-between gap-3 rounded-xl border border-slate-700/60 px-3 py-2';
+
+            const label = document.createElement('span');
+            label.className = 'min-w-0 truncate text-sm';
+            label.textContent = net.ssid;
+            if (net.ssid === data.last) {
+              const badge = document.createElement('span');
+              badge.className = 'ml-2 shrink-0 text-[0.65rem] font-semibold uppercase tracking-wider text-brand-300';
+              badge.textContent = 'last used';
+              label.appendChild(badge);
+            }
+
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'deleteButton';
+            del.title = 'Remove ' + net.ssid;
+            del.textContent = '×';
+            del.addEventListener('click', () => {
+              fetch(`${baseUrl}/deleteWifiNet`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ssid: net.ssid })
+              })
+              .then(response => response.text())
+              .then(message => {
+                toastForResult(message, 'Network removed.');
+                if (message === 'OK') loadWifiNets();
+              })
+              .catch(error => { console.error('Error deleting network:', error); });
+            });
+
+            row.appendChild(label);
+            row.appendChild(del);
+            listEl.appendChild(row);
+          });
+        })
+        .catch(error => { console.error('Error loading saved networks:', error); });
+    }
 
     document.getElementById('wifiModeSelect').addEventListener('change', togglePasswordModeVisibility);
 

@@ -25,6 +25,11 @@ bool netStaConnect() {
   if (webuiBgActive() && Wifi_Mode == "AP") {
     return false;
   }
+  // Saved networks first (the last-used one wins); the legacy single
+  // network is only used when no profiles are stored.
+  if (wifiProfilesCount() > 0) {
+    return wifiConnectSaved(5000, 15000);
+  }
   String ssid = NVS.getString("wifi_ssid");
   String pass = NVS.getString("wifi_password");
   if (ssid == "") {

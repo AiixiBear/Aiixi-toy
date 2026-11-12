@@ -117,6 +117,7 @@
             <span id="otpCount" class="text-xs text-slate-500"></span>
           </div>
           <p class="mb-3 text-sm text-slate-400">Tap a row to copy its code.</p>
+          <input type="search" id="otpSearch" class="field mb-3" placeholder="Search accounts..." autocomplete="off">
           <ul id="otpList" class="list-none p-0"></ul>
         </div>
 
@@ -190,6 +191,10 @@
       <!-- Settings Panel -->
       <div role="tabpanel" hidden>
         <div class="cardGrid">
+        <div class="col-span-full">
+          <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Setup</h5>
+        </div>
+
         <div class="card md:col-span-2">
           <h4 class="cardTitle">WiFi</h4>
           <label for="wifiModeSelect" class="flabel">WiFi Mode:</label>
@@ -203,6 +208,7 @@
 
           <label for="passwordInput" class="flabel">Password:</label>
           <input type="password" id="passwordInput" class="field">
+          <p class="mt-1.5 text-xs leading-relaxed text-slate-500">In AP mode this is the hotspot password, used when Password Mode below is Fixed.</p>
 
           <div id="passwordModeDiv">
             <label for="passwordModeSelect" class="flabel">Password Mode:</label>
@@ -211,6 +217,7 @@
               <option value="1">Fixed</option>
             </select>
           </div>
+          <p class="mt-1.5 text-xs leading-relaxed text-slate-500">Random: a new password is generated each time you open WiFi Setup on the device, and shown on its screen. Fixed: the device always uses the Password above.</p>
 
           <button type="button" id="applyWifiButton" class="btn-primary mt-4">Apply</button>
         </div>
@@ -219,6 +226,7 @@
           <h4 class="cardTitle">Time</h4>
           <label for="timezone" class="flabel">Timezone (GMT)</label>
           <input type="number" id="timezone" name="timezone" min="-12" max="14" step="0.5" value="0" class="field">
+          <p class="mt-1.5 text-xs leading-relaxed text-slate-500">GMT offset in hours. Taiwan is 8. TOTP codes come out wrong if this is wrong.</p>
           <button type="button" id="unixButton" class="btn-primary mt-3">Sync Time</button>
         </div>
 
@@ -228,10 +236,15 @@
           <button type="button" id="showSetPinButton" class="btn-ghost">Set / Change PIN</button>
         </div>
 
+        <div class="col-span-full mt-2">
+          <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Device</h5>
+        </div>
+
         <div class="card md:col-span-2">
           <h4 class="cardTitle">Screen</h4>
           <label for="screenTimeout" class="flabel">Timeout (s)</label>
           <input type="number" id="screenTimeout" name="screenTimeout" min="0" max="9999" step="5" value="0" class="field">
+          <p class="mt-1.5 text-xs leading-relaxed text-slate-500">Seconds before the device screen sleeps. 0 = never.</p>
 
           <label for="brightness" class="flabel">Brightness</label>
           <input type="range" id="brightness" name="brightness" min="15" max="255" value="100" class="mt-1 block w-full accent-brand-500">
@@ -249,6 +262,10 @@
           <h4 class="cardTitle">Apps</h4>
           <p class="mb-3 text-sm text-slate-400">Choose which apps appear on the device home screen. Use the arrows to change their order. WiFi Setup stays on: it is the way back to this page.</p>
           <div id="appList" class="flex flex-col gap-2"></div>
+        </div>
+
+        <div class="col-span-full mt-2">
+          <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Connections</h5>
         </div>
 
         <div class="card">
@@ -269,6 +286,10 @@
             WebUI runs in background
           </label>
           <button type="button" id="saveWebuiBgButton" class="btn-primary mt-3">Save WebUI Background Settings</button>
+        </div>
+
+        <div class="col-span-full mt-2">
+          <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Services</h5>
         </div>
 
         <div class="card">
@@ -305,7 +326,18 @@
       <div role="tabpanel" hidden>
         <div class="card">
         <h4 class="cardTitle"><em>Aiixi-toy</em></h4>
-        <p class="text-sm">Current version <strong>1.2</strong></p>
+        <p class="mb-4 text-sm">Current version <strong>1.2</strong></p>
+        <dl class="flex flex-col gap-1.5 text-sm">
+          <div class="flex justify-between gap-4"><dt class="text-slate-400">Chip</dt><dd id="infoChip">—</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-400">Flash</dt><dd id="infoFlash">—</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-400">Free memory</dt><dd id="infoHeap">—</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-400">Uptime</dt><dd id="infoUptime">—</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-400">Device time</dt><dd id="infoTime">—</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-400">WiFi mode</dt><dd id="infoWifi">—</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-400">IP address</dt><dd id="infoIp">—</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-400">Signal</dt><dd id="infoRssi">—</dd></div>
+          <div class="flex justify-between gap-4"><dt class="text-slate-400">MAC address</dt><dd id="infoMac">—</dd></div>
+        </dl>
         </div>
 
         <div class="card">
@@ -319,6 +351,12 @@
           <div id="prg" class="mt-4"></div>
           <div id="prgbar" class="mt-4"><div id="bar"></div></div>
         </form>
+        </div>
+
+        <div class="card">
+        <h4 class="cardTitle">Device control</h4>
+        <p class="mb-3 text-sm text-slate-400">Restart the device. This page disconnects while it reboots and comes back once WiFi is up again.</p>
+        <button type="button" id="restartButton" class="btn-ghost">Restart device</button>
         </div>
       </div>
     </section>
@@ -414,6 +452,12 @@
           }
         });
 
+        // Refresh the Info panel vitals each time it is opened, so
+        // uptime and the device clock are current when read.
+        if (_('[role="tab"]').indexOf(tab) === 2) {
+          loadDeviceInfo();
+        }
+
         closeSidebar();
       });
     });
@@ -501,6 +545,7 @@
       loadPhotos();
       loadMemos();
       loadDeviceStatus();
+      loadDeviceInfo();
       await loadOtpList();
       await loadCodes();
     }
@@ -1518,6 +1563,106 @@
       ['#15803d', '#dcfce7'],
     ];
 
+    // --- ACCOUNT SEARCH ---
+    // Authenticator apps (Aegis, 2FAS) all put a search box over the
+    // account list; with more than a handful of accounts it is the
+    // fastest way to find a code. Filtering is display-only: rows keep
+    // updating their codes while hidden, and the device-side order is
+    // untouched.
+    function applyOtpFilter() {
+      const list = document.getElementById('otpList');
+      if (!list) {
+        return;
+      }
+      const input = document.getElementById('otpSearch');
+      const query = input ? input.value.trim().toLowerCase() : '';
+      list.querySelectorAll('.noMatch').forEach(el => el.remove());
+      const rows = list.querySelectorAll('.otpItem');
+      let shown = 0;
+      rows.forEach(row => {
+        const match = !query || (row.dataset.search || '').includes(query);
+        row.style.display = match ? '' : 'none';
+        if (match) {
+          shown++;
+        }
+      });
+      if (query && rows.length && !shown) {
+        const none = document.createElement('li');
+        none.className = 'noMatch';
+        none.style.cssText = 'padding:.9rem 1rem;color:#94a3b8;font-size:.9rem';
+        none.textContent = 'No accounts match your search.';
+        list.appendChild(none);
+      }
+      const count = document.getElementById('otpCount');
+      if (count && rows.length) {
+        count.textContent = query
+          ? shown + ' of ' + rows.length + ' accounts'
+          : rows.length + (rows.length === 1 ? ' account' : ' accounts');
+      }
+    }
+
+    document.getElementById('otpSearch').addEventListener('input', applyOtpFilter);
+
+    // --- DEVICE INFO (Info panel) ---
+    // Live vitals from GET /getInfo, refreshed on load and whenever
+    // the Info tab is opened, so uptime and the device clock are
+    // current when read.
+    function formatUptime(totalSeconds) {
+      const s = Math.max(0, Math.floor(totalSeconds || 0));
+      const d = Math.floor(s / 86400);
+      const h = Math.floor((s % 86400) / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      if (d) {
+        return d + 'd ' + h + 'h ' + m + 'm';
+      }
+      if (h) {
+        return h + 'h ' + m + 'm';
+      }
+      return m + 'm ' + (s % 60) + 's';
+    }
+
+    function loadDeviceInfo() {
+      fetchJson(`${baseUrl}/getInfo`)
+        .then(data => {
+          if (!data || data.locked) {
+            return;
+          }
+          const set = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) {
+              el.textContent = value;
+            }
+          };
+          set('infoChip', data.chip || '—');
+          set('infoFlash', data.flashMB ? data.flashMB + ' MB' : '—');
+          set('infoHeap', data.freeHeapKB != null ? data.freeHeapKB + ' KB' : '—');
+          set('infoUptime', formatUptime(data.uptimeSec));
+          set('infoTime', data.time || '—');
+          set('infoWifi', data.wifiMode || '—');
+          set('infoIp', data.ip || '—');
+          set('infoRssi', data.wifiMode === 'STA' && data.rssi ? data.rssi + ' dBm' : '—');
+          set('infoMac', data.mac || '—');
+        })
+        .catch(error => console.error('Error fetching device info:', error));
+    }
+
+    document.getElementById('restartButton').addEventListener('click', function() {
+      if (!confirm('Restart the device now?')) {
+        return;
+      }
+      fetch(`${baseUrl}/restart`, { method: 'POST' })
+        .then(response => response.text())
+        .then(text => {
+          if (text.includes('LOCKED')) {
+            showToast('Device is locked. Enter the PIN to unlock.', 'error');
+            showLockPanel();
+          } else {
+            showToast('Restarting... this page will disconnect for a few seconds.', 'success');
+          }
+        })
+        .catch(error => console.error('Error restarting:', error));
+    });
+
     function loadOtpList() {
       return fetchJson(`${baseUrl}/getOTPs`)
         .then(data => {
@@ -1545,6 +1690,7 @@
 
             const listItem = document.createElement('li');
             listItem.classList.add('otpItem');
+            listItem.dataset.search = (label + ' ' + (entry.U || '')).toLowerCase();
 
             const rowWrap = document.createElement('div');
             rowWrap.classList.add('otpRowWrap');
@@ -1620,6 +1766,7 @@
 
             otpList.appendChild(listItem);
           });
+          applyOtpFilter();
         })
         .catch(error => console.error('Error fetching data:', error));
     }

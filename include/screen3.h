@@ -387,6 +387,59 @@ void registerWebRoutes() {
     server.send(200, " text/html", "OK");
   });
 
+  //----------------getInfo--------------------       device information
+  // Read-only vitals for the WebUI Info panel, in the spirit of the
+  // WLED info panel and the Tasmota information page: chip, memory,
+  // uptime, network state and the device clock. Like /getBattery this
+  // is not PIN-gated: it exposes no secrets and changes no settings.
+  server.on("/getInfo", HTTP_GET, []() {
+    previousMillis = millis();
+    jsondata.clear();
+
+    jsondata["chip"] = ESP.getChipModel();
+    jsondata["flashMB"] = ESP.getFlashChipSize() / (1024 * 1024);
+    jsondata["freeHeapKB"] = ESP.getFreeHeap() / 1024;
+    jsondata["uptimeSec"] = millis() / 1000;
+
+    bool staConnected = (WiFi.status() == WL_CONNECTED);
+    jsondata["wifiMode"] = staConnected ? "STA" : "AP";
+    jsondata["ip"] = staConnected ? WiFi.localIP().toString() : WiFi.softAPIP().toString();
+    jsondata["rssi"] = staConnected ? WiFi.RSSI() : 0;
+    jsondata["mac"] = WiFi.macAddress();
+
+    // Formatted by hand (not strftime): strftime pulls newlib's
+    // locale-aware formatter into the link, which overflows IRAM.
+    time_t now = time(nullptr);
+    struct tm* tmNow = localtime(&now);
+    char timeBuf[16];
+    snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d:%02d",
+             tmNow->tm_hour, tmNow->tm_min, tmNow->tm_sec);
+    jsondata["time"] = timeBuf;
+
+    String dataout = "";
+    serializeJson(jsondata, dataout);
+    server.send(200, "text/html", dataout);
+  });
+
+  //----------------restart--------------------       restart the device
+  // Same PIN gate as the other state-changing endpoints: the stored
+  // PIN must currently be unlocked. The reply is sent before the
+  // restart so the browser still sees a clean OK.
+  server.on("/restart", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+  server.on("/restart", HTTP_POST, []() {
+    previousMillis = millis();
+    String pincode = NVS.getString ("pincode");
+    if (pin_UNLOCK == pincode) {
+      server.send(200, " text/html", "OK");
+      delay(200);
+      ESP.restart();
+    } else {
+      server.send(200, " text/html", "LOCKED");
+    }
+  });
+
 
   //----------------unix--------------                 set time with UNIX
   // handle preflight OPTIONS request

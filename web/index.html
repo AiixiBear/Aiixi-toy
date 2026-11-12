@@ -59,7 +59,7 @@
         </button>
       </div>
       <nav class="mt-6 flex flex-col gap-1" role="tablist" aria-label="Sections">
-        <button type="button" role="tab"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>Manage</button>
+        <button type="button" role="tab"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z" /></svg>Apps</button>
         <button type="button" role="tab"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0" aria-hidden="true"><path stroke-linecap="round" d="M6 20v-7M12 20V5M18 20v-11" /></svg>Settings</button>
         <button type="button" role="tab"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor" class="h-5 w-5 shrink-0" aria-hidden="true"><circle cx="12" cy="12" r="8.5" /><path stroke-linecap="round" d="M12 10.8V16" /><circle cx="12" cy="7.6" r="1.1" fill="currentColor" stroke="none" /></svg>Info</button>
       </nav>
@@ -105,9 +105,12 @@
     </div>
 
     <section id="appSection" class="my-4">
-      <!-- Manage Panel: the account list first (it is what most visits
-           are for, and its empty state points new users at the add
-           forms below), then add, photos and memos. -->
+      <!-- Apps Panel: everything that belongs to one of the device's
+           apps lives here (authenticator accounts, photos, memos, and
+           the weather / uptime app settings); device-wide settings
+           live in the Settings panel. The account list comes first:
+           it is what most visits are for, and its empty state points
+           new users at the add forms below. -->
       <div role="tabpanel">
         <!-- Compact account list. Codes are a supporting detail here:
              the device screen is where codes are read. -->
@@ -186,6 +189,34 @@
             <button type="button" id="saveMemosButton" class="btn-primary mt-3">Save Memos</button>
           </div>
         </div>
+
+        <!-- Weather app settings: the location the Weather app shows.
+             Per-app data lives on this Apps tab, not in Settings. -->
+        <div class="mt-6">
+          <div class="card">
+            <h4 class="cardTitle">Weather</h4>
+            <label for="wxNameInput" class="flabel">Location name:</label>
+            <input type="text" id="wxNameInput" class="field" maxlength="24">
+            <label for="wxLatInput" class="flabel">Latitude:</label>
+            <input type="number" id="wxLatInput" class="field" step="0.01" min="-90" max="90">
+            <label for="wxLonInput" class="flabel">Longitude:</label>
+            <input type="number" id="wxLonInput" class="field" step="0.01" min="-180" max="180">
+            <button type="button" id="saveWeatherButton" class="btn-primary mt-3">Save Weather Settings</button>
+          </div>
+        </div>
+
+        <!-- Uptime app settings: which status page the Uptime app shows. -->
+        <div class="mt-6">
+          <div class="card">
+            <h4 class="cardTitle">Uptime Kuma</h4>
+            <p class="mb-3 text-sm text-slate-400">Status page shown by the Uptime Kuma app. Leave the slug empty to auto-discover it from the status page.</p>
+            <label for="upBaseInput" class="flabel">Status page URL:</label>
+            <input type="text" id="upBaseInput" class="field" placeholder="https://uptime.aiixi.cc">
+            <label for="upSlugInput" class="flabel">Status page slug (empty = auto-discover):</label>
+            <input type="text" id="upSlugInput" class="field" maxlength="64">
+            <button type="button" id="saveUptimeButton" class="btn-primary mt-3">Save Uptime Settings</button>
+          </div>
+        </div>
       </div>
 
       <!-- Settings Panel -->
@@ -259,7 +290,7 @@
         </div>
 
         <div class="card md:col-span-2">
-          <h4 class="cardTitle">Apps</h4>
+          <h4 class="cardTitle">Home screen</h4>
           <p class="mb-3 text-sm text-slate-400">Choose which apps appear on the device home screen. Use the arrows to change their order. WiFi Setup stays on: it is the way back to this page.</p>
           <div id="appList" class="flex flex-col gap-2"></div>
         </div>
@@ -286,31 +317,6 @@
             WebUI runs in background
           </label>
           <button type="button" id="saveWebuiBgButton" class="btn-primary mt-3">Save WebUI Background Settings</button>
-        </div>
-
-        <div class="col-span-full mt-2">
-          <h5 class="text-xs font-semibold uppercase tracking-wider text-slate-500">Services</h5>
-        </div>
-
-        <div class="card">
-          <h4 class="cardTitle">Weather</h4>
-          <label for="wxNameInput" class="flabel">Location name:</label>
-          <input type="text" id="wxNameInput" class="field" maxlength="24">
-          <label for="wxLatInput" class="flabel">Latitude:</label>
-          <input type="number" id="wxLatInput" class="field" step="0.01" min="-90" max="90">
-          <label for="wxLonInput" class="flabel">Longitude:</label>
-          <input type="number" id="wxLonInput" class="field" step="0.01" min="-180" max="180">
-          <button type="button" id="saveWeatherButton" class="btn-primary mt-3">Save Weather Settings</button>
-        </div>
-
-        <div class="card">
-          <h4 class="cardTitle">Uptime Kuma</h4>
-          <p class="mb-3 text-sm text-slate-400">Status page shown by the Uptime Kuma app. Leave the slug empty to auto-discover it from the status page.</p>
-          <label for="upBaseInput" class="flabel">Status page URL:</label>
-          <input type="text" id="upBaseInput" class="field" placeholder="https://uptime.aiixi.cc">
-          <label for="upSlugInput" class="flabel">Status page slug (empty = auto-discover):</label>
-          <input type="text" id="upSlugInput" class="field" maxlength="64">
-          <button type="button" id="saveUptimeButton" class="btn-primary mt-3">Save Uptime Settings</button>
         </div>
 
         <div class="card">

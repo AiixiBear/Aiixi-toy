@@ -373,6 +373,20 @@ void registerWebRoutes() {
     }
   });
 
+  //----------------LOCK--------------------           lock the Aiixi-toy again
+  // Counterpart of /UNLOCK for the WebUI login: clears the shared
+  // unlock state so every PIN-checked endpoint reports LOCKED again.
+  // Locking needs no authentication (it only removes access). The
+  // device screen is unaffected: its lock is a boot-time gate.
+  server.on("/lock", HTTP_OPTIONS, []() {
+    server.send(200);
+  });
+  server.on("/lock", HTTP_POST, []() {
+    previousMillis = millis();
+    pin_UNLOCK = "";
+    server.send(200, " text/html", "OK");
+  });
+
 
   //----------------unix--------------                 set time with UNIX
   // handle preflight OPTIONS request

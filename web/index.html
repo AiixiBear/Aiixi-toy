@@ -105,10 +105,23 @@
     </div>
 
     <section id="appSection" class="my-4">
-      <!-- Manage Panel: add accounts and the compact account list. -->
+      <!-- Manage Panel: the account list first (it is what most visits
+           are for, and its empty state points new users at the add
+           forms below), then add, photos and memos. -->
       <div role="tabpanel">
+        <!-- Compact account list. Codes are a supporting detail here:
+             the device screen is where codes are read. -->
+        <div>
+          <div class="mb-1 flex items-baseline justify-between">
+            <h3 class="text-base font-semibold">Accounts</h3>
+            <span id="otpCount" class="text-xs text-slate-500"></span>
+          </div>
+          <p class="mb-3 text-sm text-slate-400">Tap a row to copy its code.</p>
+          <ul id="otpList" class="list-none p-0"></ul>
+        </div>
+
         <!-- Add zone: pasting an otpauth:// URI is the primary way to add. -->
-        <div class="parseBox">
+        <div class="parseBox mt-6">
           <h3 class="mb-1 text-base font-semibold">Add an account</h3>
           <p class="mb-3 text-sm text-slate-400">Paste an otpauth:// URI from your authenticator app, or fill in the form below.</p>
           <label for="otpauthUri" class="flabel mt-0"><strong>Paste otpauth:// URI:</strong></label>
@@ -141,17 +154,6 @@
 
             <input type="submit" class="btn-primary mt-4" value="Add OTP">
           </form>
-        </div>
-
-        <!-- Compact account list. Codes are a supporting detail here:
-             the device screen is where codes are read. -->
-        <div class="mt-6">
-          <div class="mb-1 flex items-baseline justify-between">
-            <h3 class="text-base font-semibold">Accounts</h3>
-            <span id="otpCount" class="text-xs text-slate-500"></span>
-          </div>
-          <p class="mb-3 text-sm text-slate-400">Tap a row to copy its code.</p>
-          <ul id="otpList" class="list-none p-0"></ul>
         </div>
 
         <!-- Photo frame: JPEGs for the on-device slideshow. -->
@@ -221,44 +223,9 @@
         </div>
 
         <div class="card">
-          <h4 class="cardTitle">Weather</h4>
-          <label for="wxNameInput" class="flabel">Location name:</label>
-          <input type="text" id="wxNameInput" class="field" maxlength="24">
-          <label for="wxLatInput" class="flabel">Latitude:</label>
-          <input type="number" id="wxLatInput" class="field" step="0.01" min="-90" max="90">
-          <label for="wxLonInput" class="flabel">Longitude:</label>
-          <input type="number" id="wxLonInput" class="field" step="0.01" min="-180" max="180">
-          <button type="button" id="saveWeatherButton" class="btn-primary mt-3">Save Weather Settings</button>
-        </div>
-
-        <div class="card">
-          <h4 class="cardTitle">Uptime Kuma</h4>
-          <p class="mb-3 text-sm text-slate-400">Status page shown by the Uptime Kuma app. Leave the slug empty to auto-discover it from the status page.</p>
-          <label for="upBaseInput" class="flabel">Status page URL:</label>
-          <input type="text" id="upBaseInput" class="field" placeholder="https://uptime.aiixi.cc">
-          <label for="upSlugInput" class="flabel">Status page slug (empty = auto-discover):</label>
-          <input type="text" id="upSlugInput" class="field" maxlength="64">
-          <button type="button" id="saveUptimeButton" class="btn-primary mt-3">Save Uptime Settings</button>
-        </div>
-
-        <div class="card">
-          <h4 class="cardTitle">Bluetooth</h4>
-          <p class="mb-3 text-sm text-slate-400">Bluetooth LE HID keyboard for typing OTP codes and the media remote. Turning it off disconnects the paired host and stops advertising; turning it back on restarts advertising without a reboot.</p>
-          <label class="flex items-center gap-2 text-sm text-slate-300">
-            <input type="checkbox" id="bleEnabledCheckbox" class="accent-brand-500">
-            Bluetooth enabled
-          </label>
-          <button type="button" id="saveBleButton" class="btn-primary mt-3">Save Bluetooth Settings</button>
-        </div>
-
-        <div class="card">
-          <h4 class="cardTitle">WebUI Background</h4>
-          <p class="mb-3 text-sm text-slate-400">Keep WiFi and the WebUI running while you use other apps on the device, so this page stays reachable without opening WiFi Setup. Works in both AP and STA mode. Off by default: keeping the radio on uses more battery. You can also toggle it on the device, in WiFi Setup with button A.</p>
-          <label class="flex items-center gap-2 text-sm text-slate-300">
-            <input type="checkbox" id="webuiBgCheckbox" class="accent-brand-500">
-            WebUI runs in background
-          </label>
-          <button type="button" id="saveWebuiBgButton" class="btn-primary mt-3">Save WebUI Background Settings</button>
+          <h4 class="cardTitle">Device PIN</h4>
+          <p class="mb-3 text-sm text-slate-400">Lock the OTP list and settings behind a PIN. Set one before anything else if this device is new: the WebUI asks for it at login.</p>
+          <button type="button" id="showSetPinButton" class="btn-ghost">Set / Change PIN</button>
         </div>
 
         <div class="card md:col-span-2">
@@ -285,9 +252,44 @@
         </div>
 
         <div class="card">
-          <h4 class="cardTitle">Device PIN</h4>
-          <p class="mb-3 text-sm text-slate-400">Lock the OTP list and settings behind a PIN.</p>
-          <button type="button" id="showSetPinButton" class="btn-ghost">Set / Change PIN</button>
+          <h4 class="cardTitle">Bluetooth</h4>
+          <p class="mb-3 text-sm text-slate-400">Bluetooth LE HID keyboard for typing OTP codes and the media remote. Turning it off disconnects the paired host and stops advertising; turning it back on restarts advertising without a reboot.</p>
+          <label class="flex items-center gap-2 text-sm text-slate-300">
+            <input type="checkbox" id="bleEnabledCheckbox" class="accent-brand-500">
+            Bluetooth enabled
+          </label>
+          <button type="button" id="saveBleButton" class="btn-primary mt-3">Save Bluetooth Settings</button>
+        </div>
+
+        <div class="card">
+          <h4 class="cardTitle">WebUI Background</h4>
+          <p class="mb-3 text-sm text-slate-400">Keep WiFi and the WebUI running while you use other apps on the device, so this page stays reachable without opening WiFi Setup. Works in both AP and STA mode. Off by default: keeping the radio on uses more battery. You can also toggle it on the device, in WiFi Setup with button A.</p>
+          <label class="flex items-center gap-2 text-sm text-slate-300">
+            <input type="checkbox" id="webuiBgCheckbox" class="accent-brand-500">
+            WebUI runs in background
+          </label>
+          <button type="button" id="saveWebuiBgButton" class="btn-primary mt-3">Save WebUI Background Settings</button>
+        </div>
+
+        <div class="card">
+          <h4 class="cardTitle">Weather</h4>
+          <label for="wxNameInput" class="flabel">Location name:</label>
+          <input type="text" id="wxNameInput" class="field" maxlength="24">
+          <label for="wxLatInput" class="flabel">Latitude:</label>
+          <input type="number" id="wxLatInput" class="field" step="0.01" min="-90" max="90">
+          <label for="wxLonInput" class="flabel">Longitude:</label>
+          <input type="number" id="wxLonInput" class="field" step="0.01" min="-180" max="180">
+          <button type="button" id="saveWeatherButton" class="btn-primary mt-3">Save Weather Settings</button>
+        </div>
+
+        <div class="card">
+          <h4 class="cardTitle">Uptime Kuma</h4>
+          <p class="mb-3 text-sm text-slate-400">Status page shown by the Uptime Kuma app. Leave the slug empty to auto-discover it from the status page.</p>
+          <label for="upBaseInput" class="flabel">Status page URL:</label>
+          <input type="text" id="upBaseInput" class="field" placeholder="https://uptime.aiixi.cc">
+          <label for="upSlugInput" class="flabel">Status page slug (empty = auto-discover):</label>
+          <input type="text" id="upSlugInput" class="field" maxlength="64">
+          <button type="button" id="saveUptimeButton" class="btn-primary mt-3">Save Uptime Settings</button>
         </div>
 
         <div class="card">
@@ -295,6 +297,7 @@
           <p class="mb-3 text-sm text-slate-400">Erase all stored accounts and settings.</p>
           <button type="button" id="factoryReset" class="btn-danger">Factory Reset</button>
         </div>
+
         </div>
       </div>
 
@@ -302,9 +305,11 @@
       <div role="tabpanel" hidden>
         <div class="card">
         <h4 class="cardTitle"><em>Aiixi-toy</em></h4>
-        <p class="mb-4 text-sm">Current version <strong>1.2</strong></p>
+        <p class="text-sm">Current version <strong>1.2</strong></p>
+        </div>
 
-        <h4 class="mb-2 text-base font-semibold">Update Firmware</h4>
+        <div class="card">
+        <h4 class="cardTitle">Update Firmware</h4>
         <p class="mb-3 text-sm text-slate-400">Upload the OTA firmware file to update the device.</p>
 
         <form method="POST" action="#" enctype="multipart/form-data" id="upload_form">
@@ -1530,7 +1535,7 @@
           if (data.OTPs.length === 0) {
             const emptyItem = document.createElement('li');
             emptyItem.className = 'otpEmpty';
-            emptyItem.textContent = 'No accounts yet. Add your first one above.';
+            emptyItem.textContent = 'No accounts yet. Add your first one below.';
             otpList.appendChild(emptyItem);
             return;
           }

@@ -1,5 +1,5 @@
 
-#define toolbar_height 17 // height of the toolbar area (app name, BT status, battery)
+#define toolbar_height 17 // height of the toolbar area (app name, WebUI/WiFi/BT status, battery)
 
 #define battery_width 20
 #define battery_height 10
@@ -25,6 +25,27 @@ PROGMEM const unsigned char BT_bits[13] = {
     0x28,   // ...#.#.
     0x18,   // ...##..
     0x08    // ...#...
+};
+
+// WiFi and WebUI (globe) status icons, same XBitmap style as the BT
+// rune. Drawn left of the BT icon in the toolbar (see drawNetStatus).
+#define net_icon_width 11
+#define net_icon_height 13
+
+PROGMEM const unsigned char WIFI_bits[26] = {
+    0x00, 0x00, 0x00, 0x00, 0xf8, 0x00,
+    0x06, 0x03, 0x02, 0x02, 0x00, 0x00,
+    0xf8, 0x00, 0x04, 0x01, 0x00, 0x00,
+    0x20, 0x00, 0x70, 0x00, 0x20, 0x00,
+    0x00, 0x00
+};
+
+PROGMEM const unsigned char WEB_bits[26] = {
+    0x00, 0x00, 0x00, 0x00, 0xf8, 0x00,
+    0x24, 0x01, 0x22, 0x02, 0x22, 0x02,
+    0xfe, 0x03, 0x22, 0x02, 0x22, 0x02,
+    0x24, 0x01, 0xf8, 0x00, 0x00, 0x00,
+    0x00, 0x00
 };
 
 
@@ -126,31 +147,45 @@ void drawBattery() {
 
 }
 
-// Toolbar: current app name on the left, BT status and battery on the
-// right. Only redraws the name when it changes, so the per-loop tick can
-// call it freely. The name area is kept clear of the BT icon and battery
-// on both screen sizes (battery starts at x=138 on the 160px screen).
+// Toolbar: current app name on the left; WebUI, WiFi, BT status icons
+// and the battery on the right. Only redraws the name when it changes,
+// so the per-loop tick can call it freely. The name area stops before
+// the status icons on both screen sizes (on the 160px screen the icons
+// start at x=100, on the 240px screen at x=180).
 void drawBTStatus();  // defined below; the toolbar calls it every tick
+void drawNetStatus(); // defined below; the toolbar calls it every tick
 void drawAppToolbar() {
   static String lastName = "";
   if (currentAppName != lastName) {
-    M5.Lcd.fillRect(0, 0, 120, toolbar_height, bg_color);
+    int nameWidth = screen_x - 62;
+    if (nameWidth > 120) {
+      nameWidth = 120;
+    }
+    M5.Lcd.fillRect(0, 0, nameWidth, toolbar_height, bg_color);
     M5.Lcd.setFont(&beta5pt7b);
     M5.Lcd.setTextColor(txt_color, bg_color);
     M5.Lcd.setCursor(3, 5);
     M5.Lcd.print(currentAppName);
     lastName = currentAppName;
   }
+  drawNetStatus();
   drawBTStatus();
   drawBattery();
 }
 
-// Bluetooth icon in the toolbar, left of the battery. Shown only while a host
-// is connected, so it doubles as the "can type codes now" indicator.
+// Status icon colour for "running but not connected" states.
+#define STATUS_DIM 0x7BEF
+
+// Bluetooth icon in the toolbar, left of the battery. Three states:
+// bright while a host is connected (codes can be typed), dim while
+// BLE is on but no host is connected, hidden while BLE is off.
 void drawBTStatus() {
   static int last_state = -1;
 
-  int state = bleHidConnected() ? 1 : 0;
+  int state = 0;
+  if (ble_hid_started && ble_hid_enabled) {
+    state = bleHidConnected() ? 2 : 1;
+  }
   if (state == last_state) {
     return;
   }
@@ -159,10 +194,52 @@ void drawBTStatus() {
   int bt_x = screen_x - battery_width - batt_margin - bt_icon_width - 3;
   int bt_y = (toolbar_height - bt_icon_height) / 2;   // centred in the toolbar row
 
-  if (state == 1) {
-    M5.Lcd.drawXBitmap(bt_x, bt_y, BT_bits, bt_icon_width, bt_icon_height, txt_color, bg_color);
-  } else {
+  if (state == 0) {
     M5.Lcd.fillRect(bt_x, bt_y, bt_icon_width, bt_icon_height, bg_color);
+  } else {
+    uint16_t btColor = (state == 2) ? txt_color : (uint16_t)STATUS_DIM;
+    M5.Lcd.drawXBitmap(bt_x, bt_y, BT_bits, bt_icon_width, bt_icon_height, btColor, bg_color);
+  }
+}
+
+// WiFi and WebUI status icons, left of the BT icon in the order
+// [WebUI] [WiFi] [BT] [battery]. WiFi: bright while a station link is
+// up, dim while the radio is on without one (AP mode, or still
+// connecting), hidden while the radio is off. WebUI (globe): shown
+// while the background WebUI service is running.
+void drawNetStatus() {
+  static int lastWifiState = -1;
+  static int lastWebState = -1;
+
+  int net_y = (toolbar_height - net_icon_height) / 2;
+  int wifi_x = screen_x - battery_width - batt_margin - bt_icon_width - 3 - net_icon_width - 3;
+  int web_x = wifi_x - net_icon_width - 3;
+
+  wifi_mode_t mode = WiFi.getMode();
+  int wifiState = 0;
+  if (mode == WIFI_STA && WiFi.status() == WL_CONNECTED) {
+    wifiState = 2;
+  } else if (mode != WIFI_OFF) {
+    wifiState = 1;
+  }
+  if (wifiState != lastWifiState) {
+    lastWifiState = wifiState;
+    if (wifiState == 0) {
+      M5.Lcd.fillRect(wifi_x, net_y, net_icon_width, net_icon_height, bg_color);
+    } else {
+      uint16_t wifiColor = (wifiState == 2) ? txt_color : (uint16_t)STATUS_DIM;
+      M5.Lcd.drawXBitmap(wifi_x, net_y, WIFI_bits, net_icon_width, net_icon_height, wifiColor, bg_color);
+    }
+  }
+
+  int webState = webuiBgActive() ? 1 : 0;
+  if (webState != lastWebState) {
+    lastWebState = webState;
+    if (webState == 0) {
+      M5.Lcd.fillRect(web_x, net_y, net_icon_width, net_icon_height, bg_color);
+    } else {
+      M5.Lcd.drawXBitmap(web_x, net_y, WEB_bits, net_icon_width, net_icon_height, txt_color, bg_color);
+    }
   }
 }
 

@@ -220,9 +220,11 @@ void airDraw(const AirData& data, const String& error, bool fetching) {
     M5.Lcd.setCursor(8, toolbar_height + 58);
     M5.Lcd.print(data.aqi >= 0 ? aqiCategoryText(data.aqi) : "--");
     M5.Lcd.setFont(&beta8pt7b);
-    M5.Lcd.setCursor(8, toolbar_height + 80);
+    M5.Lcd.setCursor(8, toolbar_height + 77);
     M5.Lcd.print("PM2.5 " + String(data.pm25, 1) + "  PM10 " + String(data.pm10, 1));
-    M5.Lcd.setCursor(8, toolbar_height + 96);
+    // Same spacing fix as the Weather app: at +96 the UV line's
+    // glyphs collided with the status line at screen_y - 12.
+    M5.Lcd.setCursor(8, toolbar_height + 91);
     if (data.uv >= 0) {
       M5.Lcd.print("UV " + String(data.uv, 1) + " " + uvCategoryText(data.uv) +
                    (data.uvIsMax ? " (max)" : ""));

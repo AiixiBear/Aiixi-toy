@@ -198,10 +198,12 @@ void wxDraw(const WeatherData& data, const String& error, bool fetching) {
     M5.Lcd.setCursor(8, toolbar_height + 58);
     M5.Lcd.print(wmoWeatherText(data.code));
     M5.Lcd.setFont(&beta8pt7b);
-    M5.Lcd.setCursor(8, toolbar_height + 80);
+    M5.Lcd.setCursor(8, toolbar_height + 77);
     M5.Lcd.print("H:" + String(data.tempMax, 0) + "  L:" + String(data.tempMin, 0) +
                  "  Hum " + String(data.humidity) + "%");
-    M5.Lcd.setCursor(8, toolbar_height + 96);
+    // The rain line sits 5 px higher than a naive stack: at +96 its
+    // glyphs collided with the status line at screen_y - 12.
+    M5.Lcd.setCursor(8, toolbar_height + 91);
     if (data.rainChance >= 0) {
       M5.Lcd.print("Rain " + String(data.rainChance) + "%");
     } else {
